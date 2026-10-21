@@ -71,9 +71,8 @@ input[type=text]{font:14px var(--body);color:var(--ink);background:var(--bg);bor
 button{font:500 14px var(--body);border-radius:7px;padding:9px 16px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
 button:disabled{opacity:.4;cursor:not-allowed}
-button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 button.link{border:none;padding:0;background:none;color:var(--accent);text-decoration:underline;font-size:13px}
-textarea{font:14px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:10px;min-height:60px;resize:vertical;width:100%;box-sizing:border-box}
 .nav{display:flex;justify-content:space-between;gap:10px}
 .nav .right{margin-left:auto}
 
@@ -266,7 +265,7 @@ let order = shuffle(ITEMS.map((_,i)=>i));
 let step = -1;                                 // -1 = profile, 0..n-1 = samples, n = summary
 const annot = { id:"", english:null, t2i:null };
 const R = ITEMS.map(it => ({ id:it.id, prompt:it.prompt, category:CATS[it.cat], subcategory:it.sub, theme:it.theme,
-  rating:null, unwanted:null, marks:[], confidence:null, comment:"", position:null }));
+  rating:null, unwanted:null, marks:[], confidence:null, position:null }));
 
 const app = document.getElementById("app");
 const showLabels = document.getElementById("showLabels");
@@ -343,9 +342,6 @@ function renderSample(){
     <div class="q"><h3>3. How sure are you about your answers?</h3>
       ${radios("cf", CONF, r.confidence, "row", (v,l)=>l)}</div>
 
-    <div class="q"><h3>Anything to add? <span style="font-weight:400;color:var(--muted)">(optional)</span></h3>
-      <textarea id="cm" placeholder="e.g. what made you lower your rating">${r.comment}</textarea></div>
-
     <div class="nav">
       <button id="prev">Back</button>
       <button class="primary" id="next" ${ok?"":"disabled"}>${step===ITEMS.length-1?"Finish":"Next"}</button>
@@ -355,7 +351,6 @@ function renderSample(){
   app.querySelectorAll('input[name="rt"]').forEach(e=>e.onchange=()=>{r.rating=+e.value;render()});
   app.querySelectorAll('input[name="cf"]').forEach(e=>e.onchange=()=>{r.confidence=e.value;render()});
   app.querySelectorAll('input[name="uw"]').forEach(e=>e.onchange=()=>{r.unwanted=e.value;if(e.value==="no")r.marks=[];render()});
-  document.getElementById("cm").oninput = e => r.comment = e.target.value;
   const clr = document.getElementById("clr"); if (clr) clr.onclick = () => { r.marks=[]; render(); };
   document.getElementById("prev").onclick = () => { step--; render(); };
   document.getElementById("next").onclick = () => { step++; render(); window.scrollTo({top:0}); };
@@ -392,7 +387,7 @@ function renderSummary(){
     <div class="nav"><button id="restart">Start over</button><button class="primary" id="copy">Copy JSON</button></div>
   </section>`;
   document.getElementById("restart").onclick = () => {
-    R.forEach(r=>Object.assign(r,{rating:null,unwanted:null,marks:[],confidence:null,comment:"",position:null}));
+    R.forEach(r=>Object.assign(r,{rating:null,unwanted:null,marks:[],confidence:null,position:null}));
     Object.assign(annot,{id:"",english:null,t2i:null}); order = shuffle(order); step = -1; render();
   };
   document.getElementById("copy").onclick = async (e) => {

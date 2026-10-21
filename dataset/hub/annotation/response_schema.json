@@ -31,7 +31,6 @@
             "items": {"type": "object", "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}}}
           },
           "confidence": {"enum": ["low", "mid", "high"]},
-          "comment": {"type": "string"},
           "position": {"type": "integer", "description": "Presentation order (1-based)"}
         }
       }

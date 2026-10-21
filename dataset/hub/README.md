@@ -91,7 +91,6 @@ Annotators first give a short profile (English level, how often they use image g
 1. **Match rating**, 1–5: *How well does the image match the text?*
 2. **Unwanted content**, yes/no: *Is there anything in the image that should not be there, given the text?* If yes, they click on each unwanted element (coordinates in an 800×520 space, 400×260 in the pilot interface).
 3. **Confidence**: not sure / fairly sure / very sure.
-4. Optional free-text comment.
 
 See [`annotation/guidelines.md`](annotation/guidelines.md) and the response format in [`annotation/response_schema.json`](annotation/response_schema.json). The pilot interface is a single self-contained HTML file.
 

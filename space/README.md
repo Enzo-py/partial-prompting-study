@@ -82,10 +82,9 @@ The stimuli are read once, when the Space starts. After you push new images or p
   "session_id": "…", "list_id": 5, "study_version": "pilot-v1",
   "dataset": {"repo": "Enzo-py/partial-prompting-ds", "revision": "<commit sha>", "split": "train"},
   "participant": {"prolific_pid": "…", "study_id": "…", "prolific_session_id": "…", "english": "fluent", "t2i": "sometimes"},
-  "strategy": "free-text answer to the final question",
   "trials": [{
     "position": 1, "sample_id": "S09", "prompt": "an apple on a table",
-    "rating": 4, "unwanted": "yes", "marks": [{"x": 0.147, "y": 0.180}], "confidence": "mid", "comment": "",
+    "rating": 4, "unwanted": "yes", "marks": [{"x": 0.147, "y": 0.180}], "confidence": "mid",
     "rt": 5310, "rt_first_rating": 1820, "rating_changes": 1,
     "case_id": "C7", "category": "C", "subcategory": "Semantic violation", "role": "test", "pair_ids": [], "...": "…"
   }],
@@ -96,7 +95,7 @@ Click marks are normalized to the image (0–1 on each axis).
 
 ## Dashboard
 
-`https://enzo-py-partial-prompting-study.hf.space/admin` shows the study while it runs: sessions completed and in progress, progress per list, exclusions, mean ratings by category, each minimal pair side by side, a table of every stimulus (rating distribution, "should not be there" rate, response time; click a row to see the image with every click mark) and the recent sessions with their free-text strategy.
+`https://enzo-py-partial-prompting-study.hf.space/admin` shows the study while it runs: sessions completed and in progress, progress per list, exclusions, mean ratings by category, each minimal pair side by side, a table of every stimulus (rating distribution, "should not be there" rate, response time; click a row to see the image with every click mark) and the recent sessions.
 
 The page asks for `ADMIN_KEY` and stays closed until that secret is set. It reads the sessions from `RESPONSES_REPO` plus the ones not pushed yet, refreshed at most once a minute (the Refresh button forces it). Sessions that fail the attention check count in the progress but not in the statistics, as in `collect_responses.py`. Prolific IDs are never sent to the page.
 

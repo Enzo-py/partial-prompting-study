@@ -9,7 +9,6 @@ Judge only **how well the image matches what the text asks for**. Do not judge h
 1. **How well does the image match the text?** 1 = does not match, 5 = fully matches.
 2. **Is there anything in the image that should not be there, given the text?** If yes, click on each element you mean.
 3. **How sure are you about your answers?**
-4. *(Optional)* A sentence explaining your answer, for example what made you lower your rating.
 
 There are no right or wrong answers, except for a few attention checks. Answer with your first impression and do not go back to change earlier answers.
 

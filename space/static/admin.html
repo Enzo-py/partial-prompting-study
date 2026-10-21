@@ -86,7 +86,6 @@ tr.stim[aria-expanded=true] td{background:var(--accent-soft)}
 .pm .t{height:8px;background:var(--bg);border-radius:3px;overflow:hidden}
 .pm .t i{display:block;height:100%;background:var(--accent);border-radius:0 3px 3px 0}
 .pm .v{text-align:right;font:500 12.5px var(--mono);font-variant-numeric:tabular-nums}
-.strategy{max-width:420px;color:var(--ink)}
 .fail{color:var(--bad);font-weight:500}
 #login{max-width:420px;margin:12vh auto;display:flex;flex-direction:column;gap:14px}
 #login form{display:flex;gap:8px}
@@ -203,13 +202,12 @@ function render() {
     <h2>Recent sessions</h2>
     <p class="sub">The last ${d.sessions.length} sessions, newest first.</p>
     <div class="tw"><table>
-      <thead><tr><th>Received</th><th>Session</th><th class="num">List</th><th class="num">Time</th><th>Source</th><th>English</th><th>T2I use</th><th>Attention</th><th>Strategy</th></tr></thead>
+      <thead><tr><th>Received</th><th>Session</th><th class="num">List</th><th class="num">Time</th><th>Source</th><th>English</th><th>T2I use</th><th>Attention</th></tr></thead>
       <tbody>${d.sessions.map(s => `<tr>
         <td class="num">${when(s.received_at)}</td><td class="mono">${esc(s.session)}</td><td class="num">${s.list_id}</td>
         <td class="num">${s.minutes == null ? "–" : fmt(s.minutes, 1) + " min"}</td>
         <td>${s.prolific ? "Prolific" : "Direct"}</td><td>${esc(s.english)}</td><td>${esc(s.t2i)}</td>
-        <td>${s.failed_check ? `<span class="fail">✕ Failed</span>` : "✓ Passed"}</td>
-        <td class="strategy">${esc(s.strategy)}</td></tr>`).join("") || `<tr><td colspan="9" class="muted">No sessions yet.</td></tr>`}</tbody>
+        <td>${s.failed_check ? `<span class="fail">✕ Failed</span>` : "✓ Passed"}</td></tr>`).join("") || `<tr><td colspan="8" class="muted">No sessions yet.</td></tr>`}</tbody>
     </table></div>
   </section>`;
   $("#refresh").onclick = () => load(true);

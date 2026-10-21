@@ -388,7 +388,7 @@ def summarize(sessions):
                       "prolific": bool(s.get("participant", {}).get("prolific_pid")),
                       "english": s.get("participant", {}).get("english"),
                       "t2i": s.get("participant", {}).get("t2i"),
-                      "failed_check": failed_attention_check(s), "strategy": s.get("strategy") or ""}
+                      "failed_check": failed_attention_check(s)}
                      for s in recent],
     }
 

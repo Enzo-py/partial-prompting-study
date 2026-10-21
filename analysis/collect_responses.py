@@ -28,7 +28,7 @@ for f in sorted(local.glob("responses/list*/*.json")):
         rows.append({
             "session_id": s["session_id"], "list_id": s["list_id"], "study_version": s.get("study_version"),
             "prolific_pid": p.get("prolific_pid"), "english": p.get("english"), "t2i_use": p.get("t2i"),
-            "strategy": s.get("strategy"), "total_time_ms": s.get("total_time_ms"),
+            "total_time_ms": s.get("total_time_ms"),
             **{k: (json.dumps(v) if isinstance(v, (list, dict)) else v) for k, v in t.items()},
             "n_marks": len(t.get("marks", [])),
         })
