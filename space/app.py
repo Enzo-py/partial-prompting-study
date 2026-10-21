@@ -65,6 +65,17 @@ def load_stimuli():
                                             or f.split("/")[-1].startswith(DATASET_SPLIT))]
     if not files:
         raise RuntimeError(f"No parquet file for split '{DATASET_SPLIT}' in {DATASET_REPO}@{sha[:8]}")
+    # The same parquet file uploaded at two paths (e.g. root and data/) would duplicate every row.
+    seen, unique = set(), []
+    for info in sorted(api.get_paths_info(DATASET_REPO, files, repo_type="dataset", revision=sha),
+                       key=lambda i: i.path):
+        oid = info.lfs.sha256 if info.lfs else info.blob_id
+        if oid in seen:
+            print(f"Skipping {info.path}: identical to an already selected file")
+            continue
+        seen.add(oid)
+        unique.append(info.path)
+    files = unique
     local = Path(snapshot_download(DATASET_REPO, repo_type="dataset", revision=sha,
                                    allow_patterns=files, token=HF_TOKEN))
     STIM_DIR.mkdir(parents=True, exist_ok=True)
