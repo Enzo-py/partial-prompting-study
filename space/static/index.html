@@ -228,8 +228,8 @@ async function showFeedback() {
   const el = document.getElementById("feedback");
   if (!fb || !el) return;
   const d = fb.mean_diff, pts = v => `${Math.abs(v).toFixed(1)} point${Math.abs(v).toFixed(1) === "1.0" ? "" : "s"}`;
-  const tone = Math.abs(d) < 0.3 ? "On average, your ratings were very close to those of other participants."
-    : `On average, your ratings were ${pts(d)} ${d < 0 ? "lower" : "higher"} than other participants’: you were a little ${d < 0 ? "stricter" : "more lenient"} about what the text asks for.`;
+  const tone = Math.abs(d) < 0.05 ? "On average, your ratings were the same as other participants’."
+    : `On average, your ratings were ${pts(d)} ${d < 0 ? "lower" : "higher"} than other participants’.`;
   const m = fb.most_different;
   el.hidden = false;
   el.innerHTML = `<div class="fb">

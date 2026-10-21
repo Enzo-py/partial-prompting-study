@@ -95,7 +95,7 @@ Click marks are normalized to the image (0–1 on each axis).
 
 ## Feedback to participants
 
-After their answers are saved, participants see a short comparison with the other participants: whether their ratings were on average stricter or more lenient, on how many images they were within 1 point of the others' average, and the image where they differed most (shown only for a gap of at least 1 point). It is requested separately (`POST /api/feedback`), so it can never delay or change the saved answers.
+After their answers are saved, participants see a short comparison with the other participants: how far their ratings were on average from the others' (in points), on how many images they were within 1 point of the others' average, and the image where they differed most (shown only for a gap of at least 1 point). It is requested separately (`POST /api/feedback`), so it can never delay or change the saved answers.
 
 Safeguards: it is not announced beforehand, so it cannot push anyone to guess the "expected" answer; it is worded as a comparison, never as a score; controls are never used, so the attention check stays hidden; sessions that failed the attention check are left out of the comparison; a stimulus counts only once at least 5 other participants rated it, and nothing is shown below 3 comparable stimuli (`FEEDBACK_MIN_OTHERS`, `FEEDBACK_MIN_ITEMS` in `app.py`). The first participants therefore see no feedback. The feedback is not saved.
 
