@@ -8,6 +8,7 @@ __pycache__/
 space/data/
 space/stimuli_cache/
 space/lists.json
+space/responses_cache/
 
 # downloaded responses (they stay in the private Hugging Face repo)
 responses/

@@ -2,3 +2,4 @@ data/
 __pycache__/
 lists.json
 stimuli_cache/
+responses_cache/

@@ -1,3 +1,4 @@
 data/
 __pycache__/
 stimuli_cache/
+responses_cache/

@@ -35,7 +35,7 @@ Both workflows can also be run by hand from the **Actions** tab (*Run workflow*)
 
 1. In this GitHub repository: **Settings → Secrets and variables → Actions → New repository secret**, name `HF_TOKEN`, value a Hugging Face token with write access to the Space and the dataset.
 2. Optional, under the **Variables** tab: `HF_SPACE` and `HF_DATASET` if the Space or dataset ever move.
-3. On the Space itself (Hugging Face → Space → Settings → Variables and secrets): `HF_TOKEN`, `RESPONSES_REPO`, and optionally `ADMIN_KEY` and `PROLIFIC_COMPLETION_CODE`. See [`space/README.md`](space/README.md).
+3. On the Space itself (Hugging Face → Space → Settings → Variables and secrets): `HF_TOKEN`, `RESPONSES_REPO`, `ADMIN_KEY` (opens the `/admin` dashboard) and optionally `PROLIFIC_COMPLETION_CODE`. See [`space/README.md`](space/README.md).
 
 ## Analysis
 

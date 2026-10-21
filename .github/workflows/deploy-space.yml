@@ -37,5 +37,5 @@ jobs:
         run: |
           hf upload "$HF_SPACE" space . --repo-type space \
             --delete="*" \
-            --exclude="data/*" --exclude="stimuli_cache/*" --exclude="__pycache__/*" \
+            --exclude="data/*" --exclude="stimuli_cache/*" --exclude="responses_cache/*" --exclude="__pycache__/*" \
             --commit-message "Deploy ${GITHUB_SHA::7} from GitHub"

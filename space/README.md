@@ -45,7 +45,7 @@ participant ──► Space (public URL, no login)
    | `DATASET_SPLIT` | Variable | optional, default `train` |
    | `RESPONSES_REPO` | Variable | `Enzo-py/partial-prompting-responses` |
    | `PROLIFIC_COMPLETION_CODE` | Secret | optional, the code from your Prolific study |
-   | `ADMIN_KEY` | Secret | optional, protects `/api/status` |
+   | `ADMIN_KEY` | Secret | protects `/api/status` and enables the `/admin` dashboard |
    | `STUDY_VERSION` | Variable | optional, e.g. `pilot-v1` |
 
 5. **Deploy.** Pushing to `main` on GitHub deploys this folder automatically (see the repository README). To deploy by hand from the repository root:
@@ -94,6 +94,12 @@ The stimuli are read once, when the Space starts. After you push new images or p
 ```
 Click marks are normalized to the image (0–1 on each axis).
 
+## Dashboard
+
+`https://enzo-py-partial-prompting-study.hf.space/admin` shows the study while it runs: sessions completed and in progress, progress per list, exclusions, mean ratings by category, each minimal pair side by side, a table of every stimulus (rating distribution, "should not be there" rate, response time; click a row to see the image with every click mark) and the recent sessions with their free-text strategy.
+
+The page asks for `ADMIN_KEY` and stays closed until that secret is set. It reads the sessions from `RESPONSES_REPO` plus the ones not pushed yet, refreshed at most once a minute (the Refresh button forces it). Sessions that fail the attention check count in the progress but not in the statistics, as in `collect_responses.py`. Prolific IDs are never sent to the page.
+
 ## Analysis
 
 ```bash
@@ -106,6 +112,7 @@ Downloads every session, flattens to one row per trial, and flags participants w
 ```
 app.py               backend (dataset loading, lists, assignment, saving)
 static/index.html    jsPsych experiment
+static/admin.html    dashboard (/admin)
 static/vendor/       jsPsych 7.3.4 (vendored, no CDN dependency)
 scripts/             collect_responses.py
 ```

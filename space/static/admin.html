@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Study Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap">
+<style>
+:root{
+  --bg:#f3f5f7; --surface:#ffffff; --ink:#18212b; --muted:#5d6b78; --line:#d6dde4;
+  --accent:#1f5f8b; --accent-soft:#e3eef6; --warn:#a2541b; --warn-soft:#f8ebe1; --bad:#b3261e;
+  --display:"Fraunces", Georgia, serif;
+  --body:"IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#111820; --surface:#18222c; --ink:#e4eaf0; --muted:#94a3b1; --line:#2c3a47;
+  --accent:#7db4dc; --accent-soft:#1c3346; --warn:#e3a173; --warn-soft:#3a2a1f; --bad:#f2b8b5; color-scheme:dark}}
+[hidden]{display:none!important}
+html,body{background:var(--bg);color:var(--ink)}
+body{margin:0;font-family:var(--body);font-size:14px;line-height:1.5}
+main{max-width:1180px;margin:0 auto;padding:28px 16px 64px;display:flex;flex-direction:column;gap:28px}
+h1{font:600 28px/1.2 var(--display);margin:0}
+h2{font:600 19px/1.3 var(--display);margin:0 0 4px}
+.eyebrow{font:500 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono);font-size:12.5px}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
+header .meta{display:flex;flex-direction:column;gap:2px;font-size:12.5px;color:var(--muted)}
+button{font:500 13px var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:7px 14px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+input[type=password]{font:14px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:8px 10px;min-width:0;flex:1}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px}
+section > .sub{margin:0 0 14px;color:var(--muted);font-size:13px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.tile b{display:block;font:600 30px/1.1 var(--display);margin-top:6px;font-variant-numeric:tabular-nums}
+.tile span.note{font-size:12px;color:var(--muted)}
+.warnbox{background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:10px 14px;font-size:13px}
+.err{color:var(--bad)}
+/* list progress */
+.lists{display:flex;flex-direction:column;gap:8px}
+.lrow{display:grid;grid-template-columns:64px 1fr 120px;gap:12px;align-items:center}
+.track{height:14px;background:var(--bg);border-radius:4px;display:flex;gap:2px;overflow:hidden}
+.track i{display:block;height:100%;background:var(--accent);border-radius:0 4px 4px 0}
+.track i.pend{background:var(--accent-soft);border-radius:0 4px 4px 0}
+.lrow .n{font:500 12.5px var(--mono);color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+/* tables */
+.tw{overflow-x:auto;margin:0 -4px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{font:500 11.5px var(--mono);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th.sortable{cursor:pointer}
+th.sortable:hover,th.sorted{color:var(--ink)}
+td{padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.stim{cursor:pointer}
+tr.stim:hover td{background:var(--bg)}
+tr.stim[aria-expanded=true] td{background:var(--accent-soft)}
+.prompt{font:500 14px var(--display)}
+.tag{display:inline-block;font:500 11px var(--mono);padding:1px 6px;border-radius:4px;background:var(--bg);color:var(--muted);border:1px solid var(--line);white-space:nowrap}
+.tag.ctrl{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.meanbar{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.meanbar .t{width:70px;height:8px;background:var(--bg);border-radius:3px;overflow:hidden}
+.meanbar .t i{display:block;height:100%;background:var(--accent);border-radius:0 3px 3px 0}
+.hist{display:inline-flex;align-items:flex-end;gap:2px;height:26px}
+.hist i{display:block;width:9px;background:var(--accent);border-radius:2px 2px 0 0;min-height:1px}
+.hist i.zero{background:var(--line)}
+/* detail row */
+.detail td{background:var(--bg);padding:16px}
+.detail .wrap{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+.stimimg{position:relative;width:280px;max-width:100%;line-height:0;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+.stimimg img{width:100%;height:auto}
+.stimimg .mk{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--warn);opacity:.55;box-shadow:0 0 0 2px var(--surface)}
+.detail dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0;font-size:13px;max-width:520px}
+.detail dt{color:var(--muted)}
+.detail dd{margin:0}
+/* pairs */
+.pairs{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.pair{border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.pair .head{display:flex;justify-content:space-between;align-items:baseline}
+.pm{display:grid;grid-template-columns:1fr 70px 52px;gap:10px;align-items:center;font-size:13px}
+.pm .t{height:8px;background:var(--bg);border-radius:3px;overflow:hidden}
+.pm .t i{display:block;height:100%;background:var(--accent);border-radius:0 3px 3px 0}
+.pm .v{text-align:right;font:500 12.5px var(--mono);font-variant-numeric:tabular-nums}
+.strategy{max-width:420px;color:var(--ink)}
+.fail{color:var(--bad);font-weight:500}
+#login{max-width:420px;margin:12vh auto;display:flex;flex-direction:column;gap:14px}
+#login form{display:flex;gap:8px}
+@media (max-width:640px){
+  .lrow{grid-template-columns:48px 1fr 92px}
+  h1{font-size:24px}
+}
+</style>
+</head>
+<body>
+<div id="login" class="card" hidden>
+  <div class="eyebrow">Partial prompt study</div>
+  <h1>Dashboard</h1>
+  <p class="muted" style="margin:0">Enter the <span class="mono">ADMIN_KEY</span> set on the Space.</p>
+  <form id="loginform"><input type="password" id="key" autocomplete="current-password" placeholder="Admin key" required><button class="primary">Open</button></form>
+  <p id="loginerr" class="err" hidden></p>
+</div>
+<main id="app" hidden></main>
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (v, d = 2) => v == null ? "–" : (+v).toFixed(d);
+const pct = v => v == null ? "–" : Math.round(v * 100) + "%";
+const when = iso => iso ? new Date(iso).toLocaleString(undefined, {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"}) : "–";
+
+const params = new URLSearchParams(location.search);
+let key = params.get("key") || "";
+try { key = key || sessionStorage.getItem("adminKey") || ""; } catch (e) {}
+let data = null, sort = {col: "sample_id", dir: 1}, open = new Set();
+
+$("#loginform").onsubmit = e => { e.preventDefault(); key = $("#key").value.trim(); load(); };
+
+async function load(refresh = false) {
+  if (!key) { $("#login").hidden = false; return; }
+  const r = await fetch(`/api/summary?key=${encodeURIComponent(key)}${refresh ? "&refresh=true" : ""}`);
+  if (!r.ok) {
+    const msg = (await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`;
+    try { sessionStorage.removeItem("adminKey"); } catch (e) {}
+    $("#app").hidden = true; $("#login").hidden = false;
+    $("#loginerr").hidden = false; $("#loginerr").textContent = msg;
+    return;
+  }
+  try { sessionStorage.setItem("adminKey", key); } catch (e) {}
+  if (params.has("key")) history.replaceState(null, "", location.pathname);  // keep the key out of the address bar
+  data = await r.json();
+  $("#login").hidden = true; $("#app").hidden = false;
+  render();
+}
+
+function render() {
+  const d = data, t = d.totals;
+  const maxList = Math.max(1, ...d.lists.map(l => l.completed + l.in_progress));
+  const spread = Math.max(...d.lists.map(l => l.completed)) - Math.min(...d.lists.map(l => l.completed));
+  $("#app").innerHTML = `
+  <header>
+    <div><div class="eyebrow">Partial prompt study · ${esc(d.study_version)}</div><h1>Dashboard</h1></div>
+    <div class="meta">
+      <span>Stimuli <span class="mono">${esc(d.dataset)}</span></span>
+      <span>Saving to <span class="mono">${esc(d.saving_to)}</span></span>
+      <span>Updated ${when(d.generated_at)} · <button id="refresh">Refresh</button></span>
+    </div>
+  </header>
+  ${d.saving_to.startsWith("local") ? `<div class="warnbox">Responses are not being pushed to the Hub. They will be lost when the Space restarts. Set <span class="mono">HF_TOKEN</span> and <span class="mono">RESPONSES_REPO</span>.</div>` : ""}
+
+  <div class="tiles">
+    <div class="tile"><span class="eyebrow">Completed</span><b>${t.completed}</b><span class="note">sessions saved</span></div>
+    <div class="tile"><span class="eyebrow">In progress</span><b>${t.in_progress}</b><span class="note">started in the last 30 min</span></div>
+    <div class="tile"><span class="eyebrow">Excluded</span><b>${t.excluded}</b><span class="note">failed the attention check</span></div>
+    <div class="tile"><span class="eyebrow">Median time</span><b>${t.median_minutes == null ? "–" : fmt(t.median_minutes, 1) + " min"}</b><span class="note">per completed session</span></div>
+  </div>
+
+  <section class="card">
+    <h2>Progress per list</h2>
+    <p class="sub">${d.lists.length} counterbalanced lists. New participants get the least-filled list. ${t.completed ? `Gap between the fullest and emptiest list: ${spread}.` : ""}</p>
+    <div class="lists">${d.lists.map(l => `
+      <div class="lrow" title="List ${l.list_id}: ${l.completed} completed, ${l.in_progress} in progress, ${l.items} items">
+        <span class="mono">List ${l.list_id}</span>
+        <div class="track">${l.completed ? `<i style="width:${l.completed / maxList * 100}%"></i>` : ""}${l.in_progress ? `<i class="pend" style="width:${l.in_progress / maxList * 100}%"></i>` : ""}</div>
+        <span class="n">${l.completed} done${l.in_progress ? ` · ${l.in_progress} live` : ""}</span>
+      </div>`).join("")}
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>By category</h2>
+    <p class="sub">Test stimuli only. Rating from 1 (does not match) to 5 (matches). Excluded sessions are left out of every statistic below.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Category</th><th class="num">Ratings</th><th class="num">Mean rating</th><th class="num">“Should not be there”</th></tr></thead>
+      <tbody>${d.categories.map(c => `<tr>
+        <td><span class="tag">${esc(c.category)}</span> ${esc(c.name)}</td>
+        <td class="num">${c.n}</td><td class="num">${meanbar(c.mean)}</td><td class="num">${pct(c.unwanted_rate)}</td></tr>`).join("")}</tbody>
+    </table></div>
+  </section>
+
+  <section class="card">
+    <h2>Minimal pairs</h2>
+    <p class="sub">Members of a pair are seen by different participants. Compare their mean ratings.</p>
+    <div class="pairs">${d.pairs.map(p => `<div class="pair">
+      <div class="head"><span class="mono">${esc(p.pair_id)}</span></div>
+      ${p.members.map(m => `<div class="pm" title="${esc(m.sample_id)}: n = ${m.n}">
+        <span><span class="mono">${esc(m.sample_id)}</span> <span class="prompt">${esc(m.prompt)}</span>${m.pair_role ? ` <span class="tag">${esc(m.pair_role)}</span>` : ""}</span>
+        <div class="t">${m.mean != null ? `<i style="width:${(m.mean - 1) / 4 * 100}%"></i>` : ""}</div>
+        <span class="v">${fmt(m.mean)} <span class="muted">n${m.n}</span></span></div>`).join("")}
+    </div>`).join("")}</div>
+  </section>
+
+  <section class="card">
+    <h2>Stimuli</h2>
+    <p class="sub">Click a row to see the image with every click mark. Click a column header to sort.</p>
+    <div class="tw"><table id="stimtable"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Recent sessions</h2>
+    <p class="sub">The last ${d.sessions.length} sessions, newest first.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Received</th><th>Session</th><th class="num">List</th><th class="num">Time</th><th>Source</th><th>English</th><th>T2I use</th><th>Attention</th><th>Strategy</th></tr></thead>
+      <tbody>${d.sessions.map(s => `<tr>
+        <td class="num">${when(s.received_at)}</td><td class="mono">${esc(s.session)}</td><td class="num">${s.list_id}</td>
+        <td class="num">${s.minutes == null ? "–" : fmt(s.minutes, 1) + " min"}</td>
+        <td>${s.prolific ? "Prolific" : "Direct"}</td><td>${esc(s.english)}</td><td>${esc(s.t2i)}</td>
+        <td>${s.failed_check ? `<span class="fail">✕ Failed</span>` : "✓ Passed"}</td>
+        <td class="strategy">${esc(s.strategy)}</td></tr>`).join("") || `<tr><td colspan="9" class="muted">No sessions yet.</td></tr>`}</tbody>
+    </table></div>
+  </section>`;
+  $("#refresh").onclick = () => load(true);
+  renderStimuli();
+}
+
+function meanbar(m) {
+  return `<span class="meanbar">${fmt(m)}<span class="t">${m != null ? `<i style="width:${(m - 1) / 4 * 100}%"></i>` : ""}</span></span>`;
+}
+
+const COLS = [
+  ["sample_id", "ID"], ["prompt", "Prompt"], ["case_id", "Case"], ["expected_penalty", "Expected"],
+  ["n", "n", 1], ["mean", "Mean rating", 1], ["dist", "Ratings 1–5"], ["unwanted_rate", "Not there", 1],
+  ["median_rt_s", "Median RT", 1],
+];
+
+function renderStimuli() {
+  const rows = [...data.stimuli].sort((a, b) => {
+    const x = a[sort.col], y = b[sort.col];
+    if (x == null) return 1; if (y == null) return -1;
+    return (x > y ? 1 : x < y ? -1 : 0) * sort.dir;
+  });
+  const tbl = $("#stimtable");
+  tbl.innerHTML = `<thead><tr>${COLS.map(([k, label, num]) =>
+    `<th class="${num ? "num " : ""}${k !== "dist" ? "sortable" : ""}${sort.col === k ? " sorted" : ""}" data-k="${k}">${label}${sort.col === k ? (sort.dir > 0 ? " ↑" : " ↓") : ""}</th>`).join("")}</tr></thead>
+  <tbody>${rows.map(s => {
+    const peak = Math.max(1, ...s.dist);
+    return `<tr class="stim" data-id="${esc(s.sample_id)}" aria-expanded="${open.has(s.sample_id)}" tabindex="0">
+      <td class="mono">${esc(s.sample_id)}</td>
+      <td><span class="prompt">${esc(s.prompt)}</span></td>
+      <td>${s.role === "control" ? `<span class="tag ctrl">control</span>` : `<span class="tag">${esc(s.case_id)}</span>`}</td>
+      <td class="muted">${esc(s.expected_penalty)}</td>
+      <td class="num">${s.n}</td>
+      <td class="num">${meanbar(s.mean)}</td>
+      <td><span class="hist" title="${s.dist.map((c, i) => `${i + 1}: ${c}`).join(" · ")}">${s.dist.map(c => `<i class="${c ? "" : "zero"}" style="height:${c ? Math.max(3, c / peak * 26) : 1}px"></i>`).join("")}</span></td>
+      <td class="num">${pct(s.unwanted_rate)}</td>
+      <td class="num">${s.median_rt_s == null ? "–" : fmt(s.median_rt_s, 1) + " s"}</td>
+    </tr>${open.has(s.sample_id) ? detail(s) : ""}`;
+  }).join("")}</tbody>`;
+  tbl.querySelectorAll("th.sortable").forEach(th => th.onclick = () => {
+    const k = th.dataset.k;
+    sort = {col: k, dir: sort.col === k ? -sort.dir : (["n", "mean", "unwanted_rate", "median_rt_s"].includes(k) ? -1 : 1)};
+    renderStimuli();
+  });
+  tbl.querySelectorAll("tr.stim").forEach(tr => {
+    const toggle = () => { const id = tr.dataset.id; open.has(id) ? open.delete(id) : open.add(id); renderStimuli(); };
+    tr.onclick = toggle;
+    tr.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } };
+  });
+}
+
+function detail(s) {
+  const c = s.confidence;
+  return `<tr class="detail"><td colspan="${COLS.length}"><div class="wrap">
+    <div class="stimimg"><img src="/stimuli/${encodeURIComponent(s.file_name)}" alt="${esc(s.prompt)}">
+      ${s.marks.map(([x, y]) => `<div class="mk" style="left:${x * 100}%;top:${y * 100}%"></div>`).join("")}</div>
+    <dl>
+      <dt>Category</dt><dd><span class="tag">${esc(s.category)}</span> ${esc(s.category_name)} · ${esc(s.subcategory)}</dd>
+      <dt>Expected penalty</dt><dd>${esc(s.expected_penalty)}</dd>
+      <dt>Ratings</dt><dd>${s.dist.map((n, i) => `${i + 1}: <b>${n}</b>`).join(" · ")}</dd>
+      <dt>Confidence</dt><dd>Not sure <b>${c.low}</b> · Fairly sure <b>${c.mid}</b> · Very sure <b>${c.high}</b></dd>
+      <dt>Click marks</dt><dd>${s.marks.length}</dd>
+    </dl></div></td></tr>`;
+}
+
+load();
+</script>
+</body>
+</html>

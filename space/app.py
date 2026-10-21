@@ -275,6 +275,139 @@ def status(key: str = ""):
             "saving_to": RESPONSES_REPO if scheduler else "local folder only (RESPONSES_REPO or HF_TOKEN missing)"}
 
 
+# ---------------------------------------------------------------- admin summary
+RESP_CACHE = ROOT / "responses_cache"  # local copy of the responses repo, refreshed by /api/summary
+summary_lock = threading.Lock()
+session_cache = {"at": 0.0, "sessions": {}}
+
+
+def load_sessions(max_age=60):
+    """Every saved session, keyed by 'listNN/<id>.json': the responses repo plus the local folder."""
+    with summary_lock:
+        if time.time() - session_cache["at"] < max_age:
+            return session_cache["sessions"]
+        files = []
+        if scheduler:
+            try:
+                from huggingface_hub import snapshot_download
+                snapshot_download(RESPONSES_REPO, repo_type="dataset", allow_patterns="responses/**",
+                                  local_dir=RESP_CACHE, token=HF_TOKEN)
+            except Exception as e:  # repo may not exist yet
+                print("summary: could not download responses repo:", e)
+            files += RESP_CACHE.glob("responses/list*/*.json")
+        files += DATA_DIR.glob("list*/*.json")  # after the repo copy: local files may not be pushed yet
+        sessions = {}
+        for p in files:
+            try:
+                sessions[f"{p.parent.name}/{p.name}"] = json.loads(p.read_text())
+            except (OSError, ValueError) as e:  # e.g. a file being written
+                print(f"summary: skipping {p}: {e}")
+        session_cache.update(at=time.time(), sessions=sessions)
+        return sessions
+
+
+def failed_attention_check(session):
+    """Same rule as analysis/collect_responses.py: a rating above 2 on a control stimulus."""
+    return any((t.get("rating") or 0) > 2 for t in session.get("trials", [])
+               if BY_ID.get(t.get("sample_id"), {}).get("role") == "control")
+
+
+def median(values):
+    v = sorted(values)
+    return (v[len(v) // 2] + v[(len(v) - 1) // 2]) / 2 if v else None
+
+
+def mean(values):
+    return sum(values) / len(values) if values else None
+
+
+def summarize(sessions):
+    """Progress per list and response statistics. Sessions that fail the attention check are
+    counted in the progress but left out of the response statistics."""
+    now = time.time()
+    active = Counter(l for l, t in pending.values() if now - t < PENDING_TTL)
+    done = Counter(s.get("list_id") for s in sessions)
+    included = [s for s in sessions if not failed_attention_check(s)]
+
+    trials = defaultdict(list)
+    for s in included:
+        for t in s.get("trials", []):
+            if t.get("sample_id") in BY_ID and t.get("rating"):
+                trials[t["sample_id"]].append(t)
+
+    stimuli = []
+    for st in STIMULI:
+        ts = trials[st["sample_id"]]
+        ratings = [t["rating"] for t in ts]
+        stimuli.append({
+            **{k: st.get(k) for k in ("sample_id", "prompt", "file_name", "case_id", "category",
+                                      "category_name", "subcategory", "role", "expected_penalty")},
+            "n": len(ts), "mean": mean(ratings),
+            "dist": [ratings.count(r) for r in range(1, 6)],
+            "unwanted_rate": mean([t.get("unwanted") == "yes" for t in ts]),
+            "confidence": {c: sum(t.get("confidence") == c for t in ts) for c in ("low", "mid", "high")},
+            "median_rt_s": (median([t["rt"] for t in ts if t.get("rt")]) or 0) / 1000 or None,
+            "marks": [[m["x"], m["y"]] for t in ts for m in t.get("marks", [])],
+        })
+
+    by_cat = defaultdict(list)
+    for st in STIMULI:
+        if st["role"] != "control":
+            by_cat[(st.get("category"), st.get("category_name"))] += trials[st["sample_id"]]
+    categories = [{"category": c, "name": name, "n": len(ts), "mean": mean([t["rating"] for t in ts]),
+                   "unwanted_rate": mean([t.get("unwanted") == "yes" for t in ts])}
+                  for (c, name), ts in sorted(by_cat.items(), key=lambda kv: str(kv[0][0]))]
+
+    by_pair = defaultdict(list)
+    for st in STIMULI:
+        roles = list(st.get("pair_roles") or [])
+        for i, pid in enumerate(st["pair_ids"]):
+            ratings = [t["rating"] for t in trials[st["sample_id"]]]
+            by_pair[pid].append({"sample_id": st["sample_id"], "prompt": st["prompt"],
+                                 "pair_role": roles[i] if i < len(roles) else None,
+                                 "n": len(ratings), "mean": mean(ratings)})
+    pairs = [{"pair_id": pid, "members": members} for pid, members in sorted(by_pair.items())]
+
+    recent = sorted(sessions, key=lambda s: s.get("received_at") or "", reverse=True)[:100]
+    return {
+        "study_version": STUDY_VERSION,
+        "dataset": f"{DATASET_REPO}@{DATASET_SHA[:8]} ({DATASET_SPLIT}, {len(STIMULI)} stimuli)",
+        "saving_to": RESPONSES_REPO if scheduler else "local folder only (RESPONSES_REPO or HF_TOKEN missing)",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "totals": {"completed": len(sessions), "excluded": len(sessions) - len(included),
+                   "in_progress": sum(active.values()),
+                   "median_minutes": (median([s["total_time_ms"] for s in sessions
+                                              if s.get("total_time_ms")]) or 0) / 60000 or None},
+        "lists": [{"list_id": k, "items": len(LISTS[k]), "completed": done[k], "in_progress": active[k]}
+                  for k in range(len(LISTS))],
+        "categories": categories, "pairs": pairs, "stimuli": stimuli,
+        # No Prolific IDs here: the page only needs to tell sessions apart.
+        "sessions": [{"session": str(s.get("session_id", ""))[:8], "list_id": s.get("list_id"),
+                      "received_at": s.get("received_at"),
+                      "minutes": (s.get("total_time_ms") or 0) / 60000 or None,
+                      "prolific": bool(s.get("participant", {}).get("prolific_pid")),
+                      "english": s.get("participant", {}).get("english"),
+                      "t2i": s.get("participant", {}).get("t2i"),
+                      "failed_check": failed_attention_check(s), "strategy": s.get("strategy") or ""}
+                     for s in recent],
+    }
+
+
+@app.get("/api/summary")
+def summary(key: str = "", refresh: bool = False):
+    # Unlike /api/status, this exposes response content, so it stays closed until ADMIN_KEY is set.
+    if not ADMIN_KEY:
+        raise HTTPException(403, "set the ADMIN_KEY secret on the Space to enable the dashboard")
+    if key != ADMIN_KEY:
+        raise HTTPException(403, "wrong key")
+    return summarize(list(load_sessions(max_age=0 if refresh else 60).values()))
+
+
+@app.get("/admin")
+def admin():
+    return FileResponse(ROOT / "static" / "admin.html")
+
+
 app.mount("/stimuli", StaticFiles(directory=STIM_DIR), name="stimuli")
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
