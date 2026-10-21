@@ -5,8 +5,9 @@
 - Receives the final session JSON and writes it to DATA_DIR; a CommitScheduler pushes DATA_DIR
   to a private dataset repo every few minutes.
 
-Stimuli are loaded at startup from a Hugging Face dataset (DATASET_REPO). Required columns:
-`sample_id`, `prompt`, `image`. Optional: `role` ("control" = shown to everyone), `pair_ids`,
+Stimuli are loaded at startup from a Hugging Face dataset (DATASET_REPO), either an imagefolder
+(`metadata.jsonl` + image files) or parquet with embedded images. Required columns: `sample_id`,
+`prompt`, and the image (`file_name` / `image`). Optional: `role` ("control" = shown to everyone), `pair_ids`,
 `image_id`, plus any label columns (copied into the saved responses). Restart the Space to pick up
 a new version of the dataset; the exact dataset commit is stored with every session.
 
@@ -53,19 +54,8 @@ DATASET_REVISION = os.environ.get("DATASET_REVISION", "main")
 DATASET_SPLIT = os.environ.get("DATASET_SPLIT", "train")
 
 
-def load_stimuli():
-    """Download the split's parquet files, write the images to STIM_DIR, return (rows, commit sha)."""
-    import pyarrow.parquet as pq
-    from huggingface_hub import HfApi, snapshot_download
-
-    api = HfApi(token=HF_TOKEN)
-    sha = api.dataset_info(DATASET_REPO, revision=DATASET_REVISION).sha
-    files = [f for f in api.list_repo_files(DATASET_REPO, repo_type="dataset", revision=sha)
-             if f.endswith(".parquet") and (f"/{DATASET_SPLIT}-" in f or f"/{DATASET_SPLIT}/" in f
-                                            or f.split("/")[-1].startswith(DATASET_SPLIT))]
-    if not files:
-        raise RuntimeError(f"No parquet file for split '{DATASET_SPLIT}' in {DATASET_REPO}@{sha[:8]}")
-    # The same parquet file uploaded at two paths (e.g. root and data/) would duplicate every row.
+def _unique_paths(api, sha, files):
+    """Drop files whose content duplicates an earlier one (the same file uploaded at two paths)."""
     seen, unique = set(), []
     for info in sorted(api.get_paths_info(DATASET_REPO, files, repo_type="dataset", revision=sha),
                        key=lambda i: i.path):
@@ -75,28 +65,79 @@ def load_stimuli():
             continue
         seen.add(oid)
         unique.append(info.path)
-    files = unique
-    local = Path(snapshot_download(DATASET_REPO, repo_type="dataset", revision=sha,
-                                   allow_patterns=files, token=HF_TOKEN))
-    STIM_DIR.mkdir(parents=True, exist_ok=True)
-    rows = []
-    for f in sorted(files):
+    return unique
+
+
+def _parquet_rows(local, files):
+    """Rows from parquet files with embedded images, as (row, image bytes, original image path)."""
+    import pyarrow.parquet as pq
+    for f in files:
         for r in pq.read_table(local / f).to_pylist():
-            for col in ("sample_id", "prompt", "image"):
-                if r.get(col) is None:
-                    raise RuntimeError(f"Row without '{col}' in {f}")
-            img = r.pop("image")
+            img = r.pop("image", None)
             data = img.get("bytes") if isinstance(img, dict) else None
             if not data:
-                raise RuntimeError(f"{r['sample_id']}: image bytes are not embedded in the parquet file")
-            ext = Path(img.get("path") or "").suffix.lower() or (".jpg" if data[:2] == b"\xff\xd8" else ".png")
-            name = f"{r['sample_id']}{ext}"
-            (STIM_DIR / name).write_bytes(data)
-            r["file_name"] = name
-            r.setdefault("role", "test")
-            r["pair_ids"] = list(r.get("pair_ids") or [])
-            r["image_id"] = r.get("image_id") or r["sample_id"]
-            rows.append(r)
+                raise RuntimeError(f"{r.get('sample_id')}: image bytes are not embedded in {f}")
+            yield r, data, img.get("path") or ""
+
+
+def _imagefolder_rows(local, files):
+    """Rows from imagefolder metadata.jsonl files; `file_name` is relative to the metadata file."""
+    for f in files:
+        folder = (local / f).parent
+        for n, line in enumerate((local / f).read_text().splitlines(), 1):
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            if not r.get("file_name"):
+                raise RuntimeError(f"{f}, line {n}: no 'file_name'")
+            path = folder / r.pop("file_name")
+            if not path.is_file():
+                raise RuntimeError(f"{f}, line {n}: image {path.relative_to(local)} not found")
+            yield r, path.read_bytes(), path.name
+
+
+def load_stimuli():
+    """Download the stimuli, write the images to STIM_DIR, return (rows, commit sha).
+
+    Reads either an imagefolder (`metadata.jsonl` next to the images) or parquet files with the
+    images embedded, the two layouts the Hub uses for image datasets.
+    """
+    from huggingface_hub import HfApi, snapshot_download
+
+    api = HfApi(token=HF_TOKEN)
+    sha = api.dataset_info(DATASET_REPO, revision=DATASET_REVISION).sha
+    repo_files = api.list_repo_files(DATASET_REPO, repo_type="dataset", revision=sha)
+    meta = [f for f in repo_files if f.split("/")[-1] == "metadata.jsonl"]
+    if meta:
+        # An imagefolder split lives in a folder named after it; a single folder is the default split.
+        in_split = [f for f in meta if DATASET_SPLIT in f.split("/")[:-1]]
+        files = _unique_paths(api, sha, in_split or meta)
+        patterns = [f"{f.rsplit('/', 1)[0]}/**" if "/" in f else "**" for f in files]
+        reader = _imagefolder_rows
+    else:
+        files = [f for f in repo_files
+                 if f.endswith(".parquet") and (f"/{DATASET_SPLIT}-" in f or f"/{DATASET_SPLIT}/" in f
+                                                or f.split("/")[-1].startswith(DATASET_SPLIT))]
+        files = _unique_paths(api, sha, files) if files else []
+        patterns, reader = files, _parquet_rows
+    if not files:
+        raise RuntimeError(f"No metadata.jsonl or parquet file for split '{DATASET_SPLIT}' in {DATASET_REPO}@{sha[:8]}")
+    local = Path(snapshot_download(DATASET_REPO, repo_type="dataset", revision=sha,
+                                   allow_patterns=patterns, token=HF_TOKEN))
+    STIM_DIR.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for r, data, src in reader(local, sorted(files)):
+        for col in ("sample_id", "prompt"):
+            if r.get(col) is None:
+                raise RuntimeError(f"Row without '{col}' in {', '.join(files)}")
+        ext = Path(src).suffix.lower() or (".jpg" if data[:2] == b"\xff\xd8" else ".png")
+        name = f"{r['sample_id']}{ext}"
+        (STIM_DIR / name).write_bytes(data)
+        r["file_name"] = name
+        r["role"] = r.get("role") or "test"
+        r["pair_ids"] = list(r.get("pair_ids") or [])
+        r["image_id"] = r.get("image_id") or r["sample_id"]
+        rows.append(r)
     ids = [r["sample_id"] for r in rows]
     if len(ids) != len(set(ids)):
         raise RuntimeError("sample_id values must be unique")
@@ -341,7 +382,7 @@ def summarize(sessions):
         ratings = [t["rating"] for t in ts]
         stimuli.append({
             **{k: st.get(k) for k in ("sample_id", "prompt", "file_name", "case_id", "category",
-                                      "category_name", "subcategory", "role", "expected_penalty")},
+                                      "category_name", "subcategory", "role")},
             "n": len(ts), "mean": mean(ratings),
             "dist": [ratings.count(r) for r in range(1, 6)],
             "unwanted_rate": mean([t.get("unwanted") == "yes" for t in ts]),

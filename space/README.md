@@ -16,7 +16,7 @@ Collection interface for the partial-prompt human study. Participants see a text
 ## How it works
 
 ```
-startup: download DATASET_REPO (parquet) → extract images to stimuli_cache/, build the lists
+startup: download DATASET_REPO (imagefolder or parquet) → copy images to stimuli_cache/, build the lists
 
 participant ──► Space (public URL, no login)
                  ├─ POST /api/start   → assigns the least-filled list, returns its stimuli (no labels)
@@ -26,7 +26,7 @@ participant ──► Space (public URL, no login)
                                              → <RESPONSES_REPO>/responses/listNN/<session>.json
 ```
 
-**Counterbalancing.** Stimuli that belong to the same minimal pair (`pair_ids`) or reuse the same image (`image_id`) are grouped, and each participant sees exactly one member of each group, so every comparison is between-subjects. Controls and stand-alone stimuli are shown to everyone. With the current 23 stimuli this gives **6 lists of 13 items** (`/api/status` shows the current numbers). Recruit participants in multiples of 6 for balanced cells. On startup the backend writes the lists to `lists.json`.
+**Counterbalancing.** Stimuli that belong to the same minimal pair (`pair_ids`) or reuse the same image (`image_id`) are grouped, and each participant sees exactly one member of each group, so every comparison is between-subjects. Controls and stand-alone stimuli are shown to everyone. With the current 44 stimuli this gives **8 lists of 19 items** (`/api/status` shows the current numbers). Recruit participants in multiples of 8 for balanced cells. On startup the backend writes the lists to `lists.json`.
 
 **Taxonomy labels stay server-side.** The browser only receives `sample_id`, `prompt` and the image. Labels are attached to the saved file on the server.
 
@@ -66,7 +66,7 @@ With `PROLIFIC_COMPLETION_CODE` set, Prolific participants see the code at the e
 
 The stimuli are read once, when the Space starts. After you push new images or prompts to the dataset, restart the Space (Settings → Restart). Every saved session records the exact dataset commit (`dataset.revision`), so responses from different versions stay distinguishable. For the real study, pin `DATASET_REVISION` to a tag or commit so the stimuli cannot change during collection.
 
-**Dataset columns used.** Required: `sample_id` (unique), `prompt`, `image` (embedded in the parquet file). Optional: `role` (`control` = shown to everyone), `pair_ids` and `image_id` (used to build the lists). Every other column is copied as a label into the saved responses, server-side only.
+**Dataset columns used.** The dataset can be an imagefolder (`metadata.jsonl` with a `file_name` column next to the image files, the current layout) or parquet files with the images embedded. Required: `sample_id` (unique), `prompt` and the image. Optional: `role` (`control` = shown to everyone), `pair_ids` and `image_id` (used to build the lists). Every other column is copied as a label into the saved responses, server-side only.
 
 ## Before launching
 

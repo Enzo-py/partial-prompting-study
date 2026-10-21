@@ -219,7 +219,7 @@ function meanbar(m) {
 }
 
 const COLS = [
-  ["sample_id", "ID"], ["prompt", "Prompt"], ["case_id", "Case"], ["expected_penalty", "Expected"],
+  ["sample_id", "ID"], ["prompt", "Prompt"], ["case_id", "Case"],
   ["n", "n", 1], ["mean", "Mean rating", 1], ["dist", "Ratings 1–5"], ["unwanted_rate", "Not there", 1],
   ["median_rt_s", "Median RT", 1],
 ];
@@ -239,7 +239,6 @@ function renderStimuli() {
       <td class="mono">${esc(s.sample_id)}</td>
       <td><span class="prompt">${esc(s.prompt)}</span></td>
       <td>${s.role === "control" ? `<span class="tag ctrl">control</span>` : `<span class="tag">${esc(s.case_id)}</span>`}</td>
-      <td class="muted">${esc(s.expected_penalty)}</td>
       <td class="num">${s.n}</td>
       <td class="num">${meanbar(s.mean)}</td>
       <td><span class="hist" title="${s.dist.map((c, i) => `${i + 1}: ${c}`).join(" · ")}">${s.dist.map(c => `<i class="${c ? "" : "zero"}" style="height:${c ? Math.max(3, c / peak * 26) : 1}px"></i>`).join("")}</span></td>
@@ -266,7 +265,6 @@ function detail(s) {
       ${s.marks.map(([x, y]) => `<div class="mk" style="left:${x * 100}%;top:${y * 100}%"></div>`).join("")}</div>
     <dl>
       <dt>Category</dt><dd><span class="tag">${esc(s.category)}</span> ${esc(s.category_name)} · ${esc(s.subcategory)}</dd>
-      <dt>Expected penalty</dt><dd>${esc(s.expected_penalty)}</dd>
       <dt>Ratings</dt><dd>${s.dist.map((n, i) => `${i + 1}: <b>${n}</b>`).join(" · ")}</dd>
       <dt>Confidence</dt><dd>Not sure <b>${c.low}</b> · Fairly sure <b>${c.mid}</b> · Very sure <b>${c.high}</b></dd>
       <dt>Click marks</dt><dd>${s.marks.length}</dd>
