@@ -1,0 +1,17 @@
+<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two trees in an open field">
+    <defs><linearGradient id="skyB3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8db7d8"/><stop offset="1" stop-color="#e6eff5"/></linearGradient></defs>
+    <rect width="400" height="260" fill="url(#skyB3)"/>
+    <path d="M0 178 C 100 170 220 180 400 172 L400 260 L0 260 Z" fill="#9bbf68"/>
+    <path d="M0 214 C 140 208 260 218 400 210 L400 260 L0 260 Z" fill="#8db35c"/>
+    <ellipse cx="150" cy="183" rx="34" ry="5" fill="#2f4a22" opacity=".18"/><ellipse cx="284" cy="180" rx="26" ry="4" fill="#2f4a22" opacity=".18"/>
+    
+  <g transform="translate(150 182) scale(1)">
+    <rect x="-6" y="-52" width="12" height="54" fill="#6a4a30"/>
+    <circle cx="-24" cy="-62" r="22" fill="#3f7a35"/><circle cx="24" cy="-62" r="22" fill="#3f7a35"/>
+    <circle cx="0" cy="-82" r="30" fill="#3f7a35"/><circle cx="-8" cy="-90" r="12" fill="#57924a"/>
+  </g>
+  <g transform="translate(284 179) scale(0.78)">
+    <rect x="-6" y="-52" width="12" height="54" fill="#6a4a30"/>
+    <circle cx="-24" cy="-62" r="22" fill="#3f7a35"/><circle cx="24" cy="-62" r="22" fill="#3f7a35"/>
+    <circle cx="0" cy="-82" r="30" fill="#3f7a35"/><circle cx="-8" cy="-90" r="12" fill="#57924a"/>
+  </g></svg>

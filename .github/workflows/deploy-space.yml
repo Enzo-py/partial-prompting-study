@@ -1,0 +1,41 @@
+name: Deploy Space
+
+# Mirrors space/ to the Hugging Face Space on every push to main that touches it.
+# Needs the repository secret HF_TOKEN (write access to the Space).
+# Optional repository variable HF_SPACE to deploy somewhere else.
+
+on:
+  push:
+    branches: [main]
+    paths: ["space/**", ".github/workflows/deploy-space.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-space
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_SPACE: ${{ vars.HF_SPACE || 'Enzo-py/partial-prompting-study' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check the backend compiles
+        run: python -m py_compile space/app.py
+
+      - name: Install the Hugging Face CLI
+        run: pip install -U huggingface_hub
+
+      - name: Upload space/ to the Space
+        run: |
+          hf upload "$HF_SPACE" space . --repo-type space \
+            --delete="*" \
+            --exclude="data/*" --exclude="stimuli_cache/*" --exclude="__pycache__/*" \
+            --commit-message "Deploy ${GITHUB_SHA::7} from GitHub"

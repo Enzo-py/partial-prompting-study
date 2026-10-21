@@ -1,0 +1,15 @@
+<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A penguin standing on snow">
+    <rect width="400" height="260" fill="#d7e6f0"/>
+    <path d="M0 168 C 90 160 180 172 260 164 C 320 158 370 166 400 162 L400 260 L0 260 Z" fill="#f5f8fb"/>
+    <path d="M0 200 C 120 194 260 206 400 198 L400 260 L0 260 Z" fill="#e8eff5"/>
+    <ellipse cx="200" cy="214" rx="46" ry="7" fill="#7a95ab" opacity=".25"/>
+    <g transform="translate(200 140)">
+      <ellipse cx="-32" cy="8" rx="10" ry="34" fill="#1f2328" transform="rotate(14 -32 8)"/>
+      <ellipse cx="32" cy="8" rx="10" ry="34" fill="#1f2328" transform="rotate(-14 32 8)"/>
+      <ellipse cx="0" cy="0" rx="36" ry="64" fill="#1f2328"/>
+      <ellipse cx="0" cy="14" rx="25" ry="48" fill="#f7f7f5"/>
+      <circle cx="-10" cy="-46" r="5" fill="#fff"/><circle cx="10" cy="-46" r="5" fill="#fff"/>
+      <circle cx="-10" cy="-46" r="2.4" fill="#111"/><circle cx="10" cy="-46" r="2.4" fill="#111"/>
+      <polygon points="-6,-38 6,-38 0,-28" fill="#e39a2d"/>
+      <ellipse cx="-12" cy="68" rx="11" ry="5" fill="#e39a2d"/><ellipse cx="12" cy="68" rx="11" ry="5" fill="#e39a2d"/>
+    </g></svg>

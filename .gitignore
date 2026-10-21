@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.DS_Store
+.venv/
+.env
+
+# local runs of the Space
+space/data/
+space/stimuli_cache/
+space/lists.json
+
+# downloaded responses (they stay in the private Hugging Face repo)
+responses/
+*.parquet

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Partial prompt study: one annotator session",
+  "type": "object",
+  "required": ["annotator", "responses"],
+  "properties": {
+    "annotator": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string", "description": "Optional annotator ID"},
+        "english": {"enum": ["native", "fluent", "intermediate"]},
+        "t2i": {"enum": ["never", "sometimes", "regularly"], "description": "How often the annotator uses AI image generators"}
+      }
+    },
+    "image_space": {"type": "string", "description": "Coordinate space of click marks, e.g. 400x260"},
+    "responses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "rating", "unwanted", "confidence"],
+        "properties": {
+          "id": {"type": "string", "description": "sample_id from metadata.jsonl"},
+          "prompt": {"type": "string"},
+          "category": {"type": "string"},
+          "subcategory": {"type": "string"},
+          "theme": {"type": "string"},
+          "rating": {"type": "integer", "minimum": 1, "maximum": 5},
+          "unwanted": {"enum": ["yes", "no"]},
+          "marks": {
+            "type": "array",
+            "items": {"type": "object", "properties": {"x": {"type": "integer"}, "y": {"type": "integer"}}}
+          },
+          "confidence": {"enum": ["low", "mid", "high"]},
+          "comment": {"type": "string"},
+          "position": {"type": "integer", "description": "Presentation order (1-based)"}
+        }
+      }
+    }
+  }
+}

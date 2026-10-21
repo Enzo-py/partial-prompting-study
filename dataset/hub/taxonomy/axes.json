@@ -1,0 +1,51 @@
+[
+  {
+    "axis": "Exhaustivity",
+    "levels": "“apple” · “an apple” · “a single apple” · “an apple among other fruit”",
+    "crossed_with": "C2, C3",
+    "tests": "If cancelling the implicature removes the penalty, the effect is pragmatic rather than semantic.",
+    "pilot_samples": null
+  },
+  {
+    "axis": "Prompt specificity",
+    "levels": "“an apple” · “a red apple on a wooden table”",
+    "crossed_with": "C1–C9",
+    "tests": "Whether detailed prompts are read as exhaustive.",
+    "pilot_samples": "S06 ↔ S11"
+  },
+  {
+    "axis": "Prompt register",
+    "levels": "Sentence · tag list (“apple, wooden table, 4k”)",
+    "crossed_with": "C3, D2",
+    "tests": "Tag lists have no article and no head noun, so no cardinality implicature and no syntactic hierarchy.",
+    "pilot_samples": null
+  },
+  {
+    "axis": "Prompt type",
+    "levels": "Object prompt (“a mug”) · scene prompt (“a kitchen”)",
+    "crossed_with": "C1, C7, C8",
+    "tests": "How much unmentioned content a scene schema licenses.",
+    "pilot_samples": null
+  },
+  {
+    "axis": "Animacy",
+    "levels": "Inanimate · animate addition of matched size",
+    "crossed_with": "C1–C3, C9",
+    "tests": "Whether animate additions are penalized more.",
+    "pilot_samples": null
+  },
+  {
+    "axis": "Dose",
+    "levels": "0 · 1 · 3 · 10 added objects; small · large area",
+    "crossed_with": "C1, C2",
+    "tests": "A penalty curve instead of a binary effect.",
+    "pilot_samples": null
+  },
+  {
+    "axis": "Reference zero",
+    "levels": "Subject alone on a neutral background",
+    "crossed_with": "A, C",
+    "tests": "A floor for measuring the effect of any completion.",
+    "pilot_samples": null
+  }
+]

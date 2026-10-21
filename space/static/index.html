@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Image and Text Study</title>
+<link rel="stylesheet" href="/static/vendor/jspsych-7.3.4.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap">
+<style>
+:root{
+  --bg:#f3f5f7; --surface:#ffffff; --ink:#18212b; --muted:#5d6b78; --line:#d6dde4;
+  --accent:#1f5f8b; --accent-soft:#e3eef6; --warn:#a2541b; --warn-soft:#f8ebe1; --bad:#b3261e;
+  --display:"Fraunces", Georgia, serif;
+  --body:"IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#111820; --surface:#18222c; --ink:#e4eaf0; --muted:#94a3b1; --line:#2c3a47;
+  --accent:#7db4dc; --accent-soft:#1c3346; --warn:#e3a173; --warn-soft:#3a2a1f; --bad:#f2b8b5; color-scheme:dark}}
+html,body{background:var(--bg);color:var(--ink)}
+body{margin:0;font-family:var(--body);font-size:15px;line-height:1.55}
+.jspsych-display-element{font-family:var(--body);font-size:15px;line-height:1.55;color:var(--ink)}
+.jspsych-content-wrapper{align-items:flex-start}
+.jspsych-content{max-width:720px;width:100%;text-align:left;margin:0 auto;padding:28px 16px 64px;box-sizing:border-box}
+.jspsych-content p{margin:0}
+
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+.eyebrow{font:500 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.bar{flex:1;max-width:240px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+h1{font:600 28px/1.2 var(--display);margin:0 0 12px;text-wrap:balance}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:22px;display:flex;flex-direction:column;gap:22px}
+.card ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.muted{color:var(--muted)}
+.prompt{display:flex;flex-direction:column;gap:4px}
+.prompt .lbl{font:500 12px var(--mono);color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.prompt q{font:500 24px/1.25 var(--display);quotes:"“" "”"}
+.stim{position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--line);line-height:0;user-select:none}
+.stim img{width:100%;height:auto;display:block}
+.stim.marking{cursor:crosshair;outline:3px solid var(--warn);outline-offset:-3px}
+.stim .mk{position:absolute;width:28px;height:28px;margin:-14px 0 0 -14px;border:4px solid #ff7a1a;border-radius:50%;box-sizing:border-box;pointer-events:none}
+.stim .hint{position:absolute;left:10px;bottom:10px;line-height:1.3;background:var(--warn-soft);color:var(--warn);font:500 12px var(--body);padding:5px 9px;border-radius:5px}
+.q{display:flex;flex-direction:column;gap:10px}
+.q h3{font:600 15px var(--body);margin:0}
+.likert{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+.row .opt{flex:1 1 90px}
+.opt{position:relative}
+.opt input{position:absolute;opacity:0;pointer-events:none}
+.opt label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:58px;padding:8px 4px;text-align:center;border:1px solid var(--line);border-radius:7px;cursor:pointer;font-size:12px;color:var(--muted);line-height:1.25;background:var(--surface)}
+.row .opt label{min-height:44px;font-size:13.5px;color:var(--ink)}
+.opt label b{font:600 17px var(--mono);color:var(--ink)}
+.opt input:checked + label{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+.opt input:focus-visible + label{outline:2px solid var(--accent);outline-offset:2px}
+.marks{display:flex;gap:10px;align-items:center;font-size:13px;color:var(--muted)}
+textarea{font:14px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:10px;min-height:60px;resize:vertical;width:100%;box-sizing:border-box}
+.nav{display:flex;justify-content:flex-end;gap:10px}
+button.b{font:500 14px var(--body);border-radius:7px;padding:10px 18px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+button.b.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+button.b:disabled{opacity:.4;cursor:not-allowed}
+button.b:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.link{border:0;background:none;padding:0;color:var(--accent);text-decoration:underline;font-size:13px;cursor:pointer}
+.code{font:600 20px var(--mono);letter-spacing:.06em;padding:10px 14px;border:1px dashed var(--accent);border-radius:7px;align-self:flex-start;user-select:all}
+.err{color:var(--bad)}
+@media (max-width:480px){.opt label{font-size:11px;min-height:64px}.prompt q{font-size:21px}h1{font-size:24px}}
+</style>
+</head>
+<body>
+<div id="jspsych-target"></div>
+<noscript>This study needs JavaScript.</noscript>
+
+<script src="/static/vendor/jspsych-7.3.4.min.js"></script>
+<script>
+const PT = jsPsychModule.ParameterType;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const radios = (name, opts, fmt) => opts.map(([v, l]) => `
+  <div class="opt"><input type="radio" id="${name}-${v}" name="${name}" value="${v}"><label for="${name}-${v}">${fmt(v, l)}</label></div>`).join("");
+
+/* ---------------------------------------------------------------- plugins */
+class PagePlugin {
+  static info = { name: "page", parameters: {
+    html: { type: PT.HTML_STRING, default: "" }, button: { type: PT.STRING, default: "Continue" } } };
+  constructor(jsPsych) { this.jsPsych = jsPsych; }
+  trial(el, t) {
+    const t0 = performance.now();
+    el.innerHTML = `<div class="card">${t.html}<div class="nav"><button class="b primary" id="go">${t.button}</button></div></div>`;
+    el.querySelector("#go").onclick = () => { el.innerHTML = ""; this.jsPsych.finishTrial({ trial_kind: "page", rt: Math.round(performance.now() - t0) }); };
+  }
+}
+
+class ProfilePlugin {
+  static info = { name: "profile", parameters: {} };
+  constructor(jsPsych) { this.jsPsych = jsPsych; }
+  trial(el) {
+    const Q = [
+      ["english", "How would you describe your English?", "", [["native","Native"],["fluent","Fluent"],["intermediate","Intermediate"]]],
+      ["t2i", "How often do you use AI image generators?", "For example Midjourney, DALL·E, Stable Diffusion, Imagen.", [["never","Never"],["sometimes","A few times"],["regularly","Regularly"]]],
+    ];
+    el.innerHTML = `<div class="card"><div class="prompt"><span class="lbl">Before you start</span><q>About you</q></div>
+      ${Q.map(([k, l, sub, o]) => `<div class="q"><h3>${l}</h3>${sub ? `<p class="muted" style="margin-top:-6px;font-size:13px">${sub}</p>` : ""}
+        <div class="row" role="radiogroup">${radios(k, o, (v, x) => x)}</div></div>`).join("")}
+      <div class="nav"><button class="b primary" id="go" disabled>Start</button></div></div>`;
+    const ans = {};
+    const go = el.querySelector("#go");
+    Q.forEach(([k]) => el.querySelectorAll(`input[name="${k}"]`).forEach(i => i.onchange = () => {
+      ans[k] = i.value; go.disabled = !Q.every(([q]) => ans[q]); }));
+    go.onclick = () => { el.innerHTML = ""; this.jsPsych.finishTrial({ trial_kind: "profile", ...ans }); };
+  }
+}
+
+class StimulusPlugin {
+  static info = { name: "stimulus", parameters: {
+    stim: { type: PT.OBJECT, default: undefined }, index: { type: PT.INT, default: 0 }, total: { type: PT.INT, default: 0 } } };
+  constructor(jsPsych) { this.jsPsych = jsPsych; }
+  trial(el, t) {
+    const s = t.stim, t0 = performance.now();
+    const r = { rating: null, unwanted: null, confidence: null, marks: [], rating_changes: 0, rt_first_rating: null };
+    el.innerHTML = `
+      <div class="top"><span class="eyebrow">Image ${t.index + 1} of ${t.total}</span><span class="bar"><i style="width:${100 * t.index / t.total}%"></i></span></div>
+      <div class="card">
+        <div class="prompt"><span class="lbl">Text</span><q>${esc(s.prompt)}</q></div>
+        <div class="stim" id="stim"><img src="/stimuli/${encodeURIComponent(s.file_name)}" alt="" draggable="false"></div>
+        <div class="q"><h3>1. How well does the image match the text?</h3>
+          <div class="likert" role="radiogroup">${radios("rating", [[1,"Does not match"],[2,"Poorly"],[3,"Partly"],[4,"Mostly"],[5,"Fully matches"]], (v, l) => `<b>${v}</b>${l}`)}</div></div>
+        <div class="q"><h3>2. Is there anything in the image that should <em>not</em> be there, given the text?</h3>
+          <div class="row" role="radiogroup">${radios("unwanted", [["no","No"],["yes","Yes"]], (v, l) => l)}</div>
+          <div class="marks" id="marks" hidden></div></div>
+        <div class="q"><h3>3. How sure are you about your answers?</h3>
+          <div class="row" role="radiogroup">${radios("confidence", [["low","Not sure"],["mid","Fairly sure"],["high","Very sure"]], (v, l) => l)}</div></div>
+        <div class="q"><h3>Anything to add? <span class="muted" style="font-weight:400">(optional)</span></h3>
+          <textarea id="comment" placeholder="e.g. what made you lower your rating"></textarea></div>
+        <div class="nav"><button class="b primary" id="next" disabled>Next</button></div>
+      </div>`;
+    window.scrollTo({ top: 0 });
+    const stim = el.querySelector("#stim"), marksEl = el.querySelector("#marks"), next = el.querySelector("#next");
+    const refresh = () => {
+      const marking = r.unwanted === "yes";
+      stim.classList.toggle("marking", marking);
+      stim.querySelectorAll(".mk,.hint").forEach(n => n.remove());
+      r.marks.forEach(m => { const d = document.createElement("div"); d.className = "mk"; d.style.left = (m.x * 100) + "%"; d.style.top = (m.y * 100) + "%"; stim.appendChild(d); });
+      if (marking) {
+        const h = document.createElement("span"); h.className = "hint"; h.textContent = "Click on what shouldn't be there"; stim.appendChild(h);
+        marksEl.hidden = false;
+        marksEl.innerHTML = `<span>${r.marks.length} element${r.marks.length === 1 ? "" : "s"} marked</span>${r.marks.length ? `<button class="link" id="clr">Clear</button>` : ""}`;
+        const c = marksEl.querySelector("#clr"); if (c) c.onclick = () => { r.marks = []; refresh(); };
+      } else marksEl.hidden = true;
+      next.disabled = !(r.rating && r.unwanted && r.confidence);
+    };
+    el.querySelectorAll('input[name="rating"]').forEach(i => i.onchange = () => {
+      if (r.rating !== null) r.rating_changes++; else r.rt_first_rating = Math.round(performance.now() - t0);
+      r.rating = +i.value; refresh(); });
+    el.querySelectorAll('input[name="unwanted"]').forEach(i => i.onchange = () => { r.unwanted = i.value; if (i.value === "no") r.marks = []; refresh(); });
+    el.querySelectorAll('input[name="confidence"]').forEach(i => i.onchange = () => { r.confidence = i.value; refresh(); });
+    stim.addEventListener("click", ev => {
+      if (r.unwanted !== "yes") return;
+      const b = stim.querySelector("img").getBoundingClientRect();
+      const x = (ev.clientX - b.left) / b.width, y = (ev.clientY - b.top) / b.height;
+      if (x < 0 || x > 1 || y < 0 || y > 1) return;
+      r.marks.push({ x: +x.toFixed(4), y: +y.toFixed(4) }); refresh();
+    });
+    next.onclick = () => {
+      const data = { trial_kind: "stimulus", position: t.index + 1, sample_id: s.sample_id, prompt: s.prompt,
+        rating: r.rating, unwanted: r.unwanted, marks: r.marks, confidence: r.confidence,
+        comment: el.querySelector("#comment").value.trim(), rating_changes: r.rating_changes,
+        rt_first_rating: r.rt_first_rating, rt: Math.round(performance.now() - t0) };
+      el.innerHTML = ""; this.jsPsych.finishTrial(data);
+    };
+  }
+}
+
+class DebriefPlugin {
+  static info = { name: "debrief", parameters: {} };
+  constructor(jsPsych) { this.jsPsych = jsPsych; }
+  trial(el) {
+    el.innerHTML = `<div class="card"><div class="prompt"><span class="lbl">Last question</span><q>What guided your ratings?</q></div>
+      <div class="q"><h3>In a few words, what made you rate an image lower? <span class="muted" style="font-weight:400">(optional)</span></h3>
+      <textarea id="d"></textarea></div>
+      <div class="nav"><button class="b primary" id="go">Submit my answers</button></div></div>`;
+    el.querySelector("#go").onclick = () => { const v = el.querySelector("#d").value.trim(); el.innerHTML = ""; this.jsPsych.finishTrial({ trial_kind: "debrief", strategy: v }); };
+  }
+}
+
+/* ---------------------------------------------------------------- run */
+const jsPsych = initJsPsych({ display_element: "jspsych-target", on_finish: () => submit() });
+const P = {
+  prolific_pid: jsPsych.data.getURLVariable("PROLIFIC_PID") || null,
+  study_id: jsPsych.data.getURLVariable("STUDY_ID") || null,
+  prolific_session_id: jsPsych.data.getURLVariable("SESSION_ID") || null,
+};
+const target = document.getElementById("jspsych-target");
+let SESSION = null;
+
+async function submit() {
+  const all = jsPsych.data.get();
+  const profile = all.filter({ trial_kind: "profile" }).values()[0] || {};
+  const debrief = all.filter({ trial_kind: "debrief" }).values()[0] || {};
+  const payload = {
+    session_id: SESSION.session_id, list_id: SESSION.list_id,
+    participant: { ...P, english: profile.english, t2i: profile.t2i },
+    strategy: debrief.strategy || "",
+    trials: all.filter({ trial_kind: "stimulus" }).values().map(({ trial_kind, trial_type, trial_index, time_elapsed, internal_node_id, ...d }) => d),
+    total_time_ms: Math.round(all.last(1).values()[0].time_elapsed),
+    client: { user_agent: navigator.userAgent, screen: `${screen.width}x${screen.height}`, viewport: `${innerWidth}x${innerHeight}`,
+              language: navigator.language, finished_at: new Date().toISOString() },
+  };
+  const show = html => { target.innerHTML = `<div class="jspsych-content-wrapper"><div class="jspsych-content"><div class="card">${html}</div></div></div>`; };
+  show(`<div class="prompt"><span class="lbl">Saving</span><q>One moment…</q></div>`);
+  try {
+    const res = await fetch("/api/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (!res.ok) throw new Error(res.status);
+    const out = await res.json();
+    show(`<div class="prompt"><span class="lbl">Done</span><q>Thank you</q></div>
+      <p>Your answers have been saved.</p>
+      ${out.completion_code ? `<p>Your completion code:</p><div class="code">${esc(out.completion_code)}</div>
+        <p class="muted">You will be redirected to Prolific in a few seconds.</p>` : `<p class="muted">You can close this page.</p>`}`);
+    if (out.redirect) setTimeout(() => { location.href = out.redirect; }, 4000);
+  } catch (e) {
+    show(`<div class="prompt"><span class="lbl">Not saved yet</span><q>Your answers could not be sent</q></div>
+      <p class="err">Check your connection, then try again. Please do not close this page.</p>
+      <div class="nav"><button class="b primary" id="retry">Try again</button></div>`);
+    document.getElementById("retry").onclick = submit;
+  }
+}
+
+async function main() {
+  try {
+    const res = await fetch("/api/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(P) });
+    if (!res.ok) throw new Error(res.status);
+    SESSION = await res.json();
+  } catch (e) {
+    target.innerHTML = `<div class="jspsych-content-wrapper"><div class="jspsych-content"><div class="card"><div class="prompt"><span class="lbl">Error</span><q>The study could not start</q></div><p class="err">Reload the page in a minute. If it still fails, contact the researchers.</p></div></div></div>`;
+    return;
+  }
+  // preload every image before the first trial
+  await Promise.all(SESSION.stimuli.map(s => new Promise(ok => { const i = new Image(); i.onload = i.onerror = ok; i.src = "/stimuli/" + encodeURIComponent(s.file_name); })));
+
+  const stims = jsPsych.randomization.shuffle(SESSION.stimuli);
+  const timeline = [
+    { type: PagePlugin, button: "I agree, continue", html: `
+      <div class="prompt"><span class="lbl">Research study · about ${Math.max(3, Math.round(stims.length * 0.4))} minutes</span><q>Does the image match the text?</q></div>
+      <p>This study is part of academic research on how people judge images made by AI image generators. You will see ${stims.length} short texts, each with an image, and answer three quick questions about each.</p>
+      <ul class="muted">
+        <li>Participation is voluntary and you can stop at any time by closing this page.</li>
+        <li>We record your answers, response times and basic browser information. We do not collect your name or email.</li>
+        <li>Anonymized answers may be published as a research dataset.</li>
+      </ul>
+      <p>By continuing, you agree to take part.</p>` },
+    { type: ProfilePlugin },
+    { type: PagePlugin, button: "Begin", html: `
+      <div class="prompt"><span class="lbl">Instructions</span><q>How to answer</q></div>
+      <p>Imagine you typed the text into an image generator and got this image back.</p>
+      <ul>
+        <li>Judge only <b>how well the image matches what the text asks for</b>, not how beautiful or realistic it is.</li>
+        <li>If something in the image should not be there given the text, answer <b>Yes</b> to question 2 and click on it.</li>
+        <li>There are no right or wrong answers. Go with your first impression.</li>
+      </ul>` },
+    ...stims.map((s, i) => ({ type: StimulusPlugin, stim: s, index: i, total: stims.length })),
+    { type: DebriefPlugin },
+  ];
+  await jsPsych.run(timeline);
+}
+main();
+</script>
+</body>
+</html>

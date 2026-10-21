@@ -1,0 +1,20 @@
+<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg" role="img">
+  <rect width="400" height="260" fill="#d9d2c7"/><rect width="400" height="150" fill="#cfc7bb"/>
+  <rect x="250" y="28" width="96" height="74" fill="#e7e1d6" stroke="#b9b0a2" stroke-width="3"/>
+  <line x1="298" y1="28" x2="298" y2="102" stroke="#b9b0a2" stroke-width="3"/>
+  <polygon points="20,160 380,160 400,200 0,200" fill="#8c5a36"/>
+  <rect y="200" width="400" height="14" fill="#6e4528"/>
+  <rect x="30" y="214" width="14" height="46" fill="#6e4528"/><rect x="356" y="214" width="14" height="46" fill="#6e4528"/>
+  <g transform="translate(160 162) scale(1)">
+    <ellipse cy="22" rx="30" ry="6" fill="#000" opacity=".18"/>
+    <path d="M0 -18 C 22 -32 40 -10 34 8 C 30 24 14 30 0 24 C -14 30 -30 24 -34 8 C -40 -10 -22 -32 0 -18 Z" fill="#c62f2a"/>
+    <ellipse cx="-14" cy="-6" rx="7" ry="10" fill="#e8746b" opacity=".55"/>
+    <path d="M0 -18 C 1 -28 3 -34 6 -38" stroke="#4d3220" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M6 -34 C 16 -42 26 -38 28 -32 C 18 -28 10 -30 6 -34 Z" fill="#4f8a3a"/>
+  </g>
+  <g transform="translate(250 150)">
+    <ellipse cy="34" rx="30" ry="6" fill="#000" opacity=".18"/>
+    <ellipse cy="12" rx="30" ry="26" fill="#c3c24a"/><ellipse cy="-16" rx="16" ry="22" fill="#c3c24a"/>
+    <ellipse cx="-10" cy="6" rx="7" ry="12" fill="#e0df8a" opacity=".6"/>
+    <path d="M0 -36 C 0 -44 2 -50 6 -54" stroke="#4d3220" stroke-width="3" fill="none" stroke-linecap="round"/>
+  </g></svg>

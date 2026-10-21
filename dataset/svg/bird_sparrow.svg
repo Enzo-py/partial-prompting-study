@@ -1,0 +1,17 @@
+<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A small brown bird perched on a branch">
+    <rect width="400" height="260" fill="#dfe9d8"/>
+    <g fill="#c7dbbd"><circle cx="60" cy="50" r="40"/><circle cx="340" cy="70" r="55"/><circle cx="300" cy="226" r="45"/></g>
+    <path d="M30 190 C 140 170 260 160 380 128" stroke="#6e4728" stroke-width="12" fill="none" stroke-linecap="round"/>
+    <path d="M300 148 C 316 128 330 120 350 118" stroke="#6e4728" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <g fill="#5f8f45"><ellipse cx="354" cy="114" rx="14" ry="7" transform="rotate(-20 354 114)"/><ellipse cx="100" cy="176" rx="14" ry="7" transform="rotate(20 100 176)"/></g>
+    <g transform="translate(200 128)">
+      <line x1="-8" y1="22" x2="-11" y2="30" stroke="#4d3220" stroke-width="3"/>
+      <line x1="8" y1="22" x2="6" y2="30" stroke="#4d3220" stroke-width="3"/>
+      <polygon points="-40,-6 -78,-22 -74,4" fill="#7c5434"/>
+      <ellipse cx="0" cy="0" rx="44" ry="28" fill="#9a6b45"/>
+      <ellipse cx="6" cy="10" rx="30" ry="16" fill="#d9c3a2"/>
+      <ellipse cx="-10" cy="-4" rx="26" ry="15" fill="#7c5434"/>
+      <circle cx="36" cy="-20" r="20" fill="#9a6b45"/>
+      <polygon points="54,-24 70,-19 54,-14" fill="#3b2a1d"/>
+      <circle cx="42" cy="-24" r="3.2" fill="#111"/>
+    </g></svg>

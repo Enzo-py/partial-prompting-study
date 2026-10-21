@@ -1,0 +1,17 @@
+<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg" role="img">
+  <rect width="400" height="260" fill="#d9d2c7"/><rect width="400" height="150" fill="#cfc7bb"/>
+  <rect x="250" y="28" width="96" height="74" fill="#e7e1d6" stroke="#b9b0a2" stroke-width="3"/>
+  <line x1="298" y1="28" x2="298" y2="102" stroke="#b9b0a2" stroke-width="3"/>
+  <polygon points="20,160 380,160 400,200 0,200" fill="#8c5a36"/>
+  <rect y="200" width="400" height="14" fill="#6e4528"/>
+  <rect x="30" y="214" width="14" height="46" fill="#6e4528"/><rect x="356" y="214" width="14" height="46" fill="#6e4528"/>
+    <ellipse cx="200" cy="196" rx="112" ry="20" fill="#eee8dd"/>
+    <rect x="118" y="120" width="164" height="72" fill="#f1c9d3"/>
+    <ellipse cx="200" cy="192" rx="82" ry="14" fill="#f1c9d3"/>
+    <ellipse cx="200" cy="120" rx="82" ry="16" fill="#fbeef1"/>
+    <path d="M118 120 q10 22 20 0 q10 18 20 0 q10 24 20 0 q10 16 20 0 q10 22 20 0 q10 18 20 0 q10 22 20 0 q10 16 22 0" fill="#fbeef1"/>
+    <rect x="157" y="86" width="7" height="30" fill="#6fa8d6"/>
+      <ellipse cx="160" cy="78" rx="5" ry="9" fill="#f6b23c"/><ellipse cx="160" cy="81" rx="2.4" ry="4" fill="#fff4c2"/><rect x="183" y="92" width="7" height="24" fill="#f7e08a"/>
+      <ellipse cx="186" cy="84" rx="5" ry="9" fill="#f6b23c"/><ellipse cx="186" cy="87" rx="2.4" ry="4" fill="#fff4c2"/><rect x="209" y="86" width="7" height="30" fill="#79c296"/>
+      <ellipse cx="212" cy="78" rx="5" ry="9" fill="#f6b23c"/><ellipse cx="212" cy="81" rx="2.4" ry="4" fill="#fff4c2"/><rect x="235" y="92" width="7" height="24" fill="#e08cb0"/>
+      <ellipse cx="238" cy="84" rx="5" ry="9" fill="#f6b23c"/><ellipse cx="238" cy="87" rx="2.4" ry="4" fill="#fff4c2"/></svg>

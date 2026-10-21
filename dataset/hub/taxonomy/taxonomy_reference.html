@@ -1,0 +1,454 @@
+<title>Partial Prompt Taxonomy</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap">
+<style>
+/* Layout: reference sheet. Header with counts and section links, then the full case table grouped by category,
+   the cross-cutting axes, one illustrated minimal pair per category, and what stays out of scope. */
+:root{
+  --bg:#f3f5f7; --surface:#ffffff; --ink:#18212b; --muted:#5d6b78; --line:#d6dde4; --soft:#e8edf1;
+  --accent:#1f5f8b; --accent-soft:#e3eef6; --warn:#b4561d;
+  --cA:#2d6a45; --cAp:#2b7a74; --cB:#5a5aa0; --cC:#a2541b; --cD:#8a3b5c; --cE:#5d6b78; --cG:#7a5c1e;
+  --display:"Fraunces", Georgia, serif;
+  --body:"IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111820; --surface:#18222c; --ink:#e4eaf0; --muted:#94a3b1; --line:#2c3a47; --soft:#1f2b36;
+  --accent:#7db4dc; --accent-soft:#1c3346; --warn:#e3a173;
+  --cA:#79c296; --cAp:#6fc7bf; --cB:#a9a9e6; --cC:#e3a173; --cD:#e08cb0; --cE:#94a3b1; --cG:#d8b45c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111820; --surface:#18222c; --ink:#e4eaf0; --muted:#94a3b1; --line:#2c3a47; --soft:#1f2b36;
+  --accent:#7db4dc; --accent-soft:#1c3346; --warn:#e3a173;
+  --cA:#79c296; --cAp:#6fc7bf; --cB:#a9a9e6; --cC:#e3a173; --cD:#e08cb0; --cE:#94a3b1; --cG:#d8b45c; color-scheme:dark}
+
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55}
+.wrap{max-width:1120px;margin:0 auto;padding-block:32px 72px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:40px}
+header{display:flex;flex-direction:column;gap:12px;max-width:780px}
+.eyebrow{font:500 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+h1{font:600 34px/1.15 var(--display);margin:0;text-wrap:balance}
+h2{font:600 22px/1.25 var(--display);margin:0;text-wrap:balance}
+.lead{margin:0;color:var(--muted);max-width:68ch}
+.stats{display:flex;flex-wrap:wrap;gap:8px}
+.stat{font:500 13px var(--mono);padding:4px 10px;border-radius:5px;background:var(--surface);border:1px solid var(--line);font-variant-numeric:tabular-nums}
+.stat b{font-weight:600}
+.toc{display:flex;gap:18px;flex-wrap:wrap;font-size:14px}
+a{color:var(--accent)}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.key{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:13px;color:var(--muted);align-items:center}
+.key > span{display:inline-flex;align-items:center;gap:8px}
+
+section{display:flex;flex-direction:column;gap:14px;scroll-margin-top:16px}
+.sec-h{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.sec-h p{margin:4px 0 0;color:var(--muted);font-size:14px;max-width:72ch}
+
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;background:var(--surface)}
+.seg button{font:500 13px var(--body);border:0;padding:7px 14px;background:transparent;color:var(--muted);cursor:pointer}
+.seg button + button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--ink)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;line-height:1.45}
+#cases table{min-width:980px}
+#axes table{min-width:820px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+thead th{font:500 11.5px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+tr.grp td{background:var(--bg);padding:14px 12px 10px}
+.grp-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.grp-h b{font:600 15px var(--body)}
+.grp-h .d{color:var(--muted);font-size:13px}
+.cl{display:inline-grid;place-items:center;min-width:26px;height:22px;padding:0 6px;border-radius:4px;font:600 12px var(--mono);color:var(--surface)}
+.bg-A{background:var(--cA)} .bg-Ap{background:var(--cAp)} .bg-B{background:var(--cB)} .bg-C{background:var(--cC)} .bg-D{background:var(--cD)} .bg-E{background:var(--cE)} .bg-G{background:var(--cG)}
+.fg-A{color:var(--cA)} .fg-Ap{color:var(--cAp)} .fg-B{color:var(--cB)} .fg-C{color:var(--cC)} .fg-D{color:var(--cD)} .fg-E{color:var(--cE)} .fg-G{color:var(--cG)}
+td.id{font:500 12.5px var(--mono);white-space:nowrap;color:var(--muted)}
+.nm{font-weight:600}
+.def,.to{color:var(--muted);font-size:12.5px;margin-top:2px}
+q{font-family:var(--display);font-style:italic;font-weight:500;quotes:"“" "”"}
+td.anc{font-size:12.5px}
+
+.pen{display:flex;flex-direction:column;gap:5px}
+.bars{display:inline-flex;gap:3px}
+.bars i{width:10px;height:12px;border-radius:2px;background:var(--line);box-sizing:border-box}
+.bars i.f{background:var(--warn)}
+.bars i.h{background:var(--warn);opacity:.45}
+.bars.open i{background:transparent;border:1.5px dashed var(--muted)}
+.pen span{font-size:12px;color:var(--muted);line-height:1.3}
+.st{display:inline-block;font:500 11.5px var(--mono);padding:2px 7px;border-radius:4px;white-space:nowrap}
+.st.pilot{background:var(--soft);color:var(--muted)}
+.st.new{border:1px solid var(--ink);color:var(--ink);font-weight:600}
+
+.gallery{display:flex;flex-direction:column;gap:16px}
+.ex{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:24px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px}
+.fig{display:flex;flex-direction:column;gap:10px;min-width:0}
+.img{border-radius:6px;overflow:hidden;border:1px solid var(--line);line-height:0}
+.img svg{width:100%;height:auto;display:block}
+.fig .seg{align-self:flex-start}
+.txt{display:flex;flex-direction:column;gap:10px;min-width:0}
+.txt .eyebrow{font-weight:600}
+.txt h3{font:600 17px var(--body);margin:0}
+.txt q.big{font-size:26px;line-height:1.2}
+.note{margin:0;color:var(--muted);font-size:14px}
+.txt dl{margin:4px 0 0;display:grid;grid-template-columns:max-content 1fr;gap:10px 16px;font-size:14px;border-top:1px solid var(--line);padding-top:12px}
+.txt dt{font:500 11.5px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding-top:3px}
+.txt dd{margin:0;min-width:0}
+
+.out{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.out div{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:13.5px;display:flex;flex-direction:column;gap:3px}
+.out span{color:var(--muted)}
+.foot{font-size:13px;color:var(--muted);margin:0}
+
+@media (max-width:760px){.ex{grid-template-columns:1fr;gap:16px}.out{grid-template-columns:1fr}}
+@media (max-width:480px){h1{font-size:28px}.txt q.big{font-size:22px}.txt dl{grid-template-columns:1fr;gap:4px}.txt dd{margin-bottom:8px}}
+@media (prefers-reduced-motion:no-preference){.seg button{transition:background .15s,color .15s}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Partial-prompt human study · design reference</div>
+    <h1>Partial Prompt Taxonomy</h1>
+    <p class="lead">Every case is defined by a minimal pair: the same prompt with a test image and a reference image, or the same image under two prompts. The study measures how human ratings move between the two. Per sample, annotators give a 1–5 match rating, flag unwanted content with a click on its location, and report their confidence.</p>
+    <div class="stats" id="stats"></div>
+    <nav class="toc" aria-label="Sections"><a href="#cases">Cases</a><a href="#axes">Cross-cutting axes</a><a href="#examples">Visual examples</a><a href="#scope">Out of scope</a></nav>
+  </header>
+
+  <section id="cases">
+    <div class="sec-h">
+      <div>
+        <h2>Cases</h2>
+        <p>Predictions give the expected drop in rating against the minimal pair.</p>
+      </div>
+      <div class="seg" id="filter" role="group" aria-label="Filter cases"></div>
+    </div>
+    <div class="key" aria-hidden="true">
+      <span><span class="bars"><i></i><i></i><i></i></span>none</span>
+      <span><span class="bars"><i class="f"></i><i></i><i></i></span>low</span>
+      <span><span class="bars"><i class="f"></i><i class="f"></i><i></i></span>medium</span>
+      <span><span class="bars"><i class="f"></i><i class="f"></i><i class="f"></i></span>high</span>
+      <span><span class="bars"><i class="f"></i><i class="h"></i><i></i></span>in between</span>
+      <span><span class="bars open"><i></i><i></i><i></i></span>graded or open</span>
+    </div>
+    <div class="tbl"><table>
+      <thead><tr><th>ID</th><th>Case</th><th>Example: prompt → image</th><th>Minimal pair</th><th>Anchor</th><th>Prediction</th><th>Status</th></tr></thead>
+      <tbody id="cases-body"></tbody>
+    </table></div>
+  </section>
+
+  <section id="axes">
+    <div class="sec-h"><div>
+      <h2>Cross-cutting axes</h2>
+      <p>Manipulations crossed with the cases above, rather than cases of their own.</p>
+    </div></div>
+    <div class="tbl"><table>
+      <thead><tr><th>Axis</th><th>Levels</th><th>Crossed with</th><th>What it tests</th><th>Status</th></tr></thead>
+      <tbody id="axes-body"></tbody>
+    </table></div>
+  </section>
+
+  <section id="examples">
+    <div class="sec-h"><div>
+      <h2>Visual examples</h2>
+      <p>One case per category. Switch between the test and its minimal pair to see what changes.</p>
+    </div></div>
+    <div class="gallery" id="gallery"></div>
+    <p class="foot">Illustrations are placeholders for real generations or inpainted minimal pairs.</p>
+  </section>
+
+  <section id="scope">
+    <div class="sec-h"><div>
+      <h2>Out of scope</h2>
+      <p>Covered by existing work. Cite rather than redo.</p>
+    </div></div>
+    <div class="out">
+      <div><b>Lexical ambiguity resolution</b><span><a href="https://aclanthology.org/2023.acl-long.804" target="_blank" rel="noopener">TAB, Mehrabi et al., ACL 2023</a></span></div>
+      <div><b>Content implied by reasoning</b><span><a href="https://arxiv.org/html/2406.07546v2" target="_blank" rel="noopener">Commonsense-T2I</a> · <a href="https://arxiv.org/html/2406.11802v3" target="_blank" rel="noopener">PhyBench</a></span></div>
+      <div><b>Explicit negation and empty states</b><span>GenAI-Bench negation · <a href="https://arxiv.org/html/2505.02236v1" target="_blank" rel="noopener">Object-State-Bench</a> · <a href="https://pith.science/paper/2501.09425" target="_blank" rel="noopener">NegBench</a></span></div>
+      <div><b>Social defaults</b><span>“a doctor” → gender. Studied at length in the fairness literature; in an alignment study it would mostly measure annotator stereotypes.</span></div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ===================== Illustrations (400 × 260) ===================== */
+const svg = (inner, label) => `<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${label}">${inner}</svg>`;
+
+const room = (o = {}) => {
+  const c = Object.assign({ wallTop:"#cfc7bb", wall:"#d9d2c7", winFill:"#e7e1d6", winLine:"#b9b0a2", top:"#8c5a36", edge:"#6e4528" }, o);
+  return `<rect width="400" height="260" fill="${c.wall}"/><rect width="400" height="150" fill="${c.wallTop}"/>
+  <rect x="250" y="28" width="96" height="74" fill="${c.winFill}" stroke="${c.winLine}" stroke-width="3"/>
+  <line x1="298" y1="28" x2="298" y2="102" stroke="${c.winLine}" stroke-width="3"/>
+  <polygon points="20,160 380,160 400,200 0,200" fill="${c.top}"/>
+  <rect y="200" width="400" height="14" fill="${c.edge}"/>
+  <rect x="30" y="214" width="14" height="46" fill="${c.edge}"/><rect x="356" y="214" width="14" height="46" fill="${c.edge}"/>`;
+};
+const RED_ROOM = { wallTop:"#b8473f", wall:"#c4554c", winFill:"#eab9b2", winLine:"#93342d", top:"#8f2621", edge:"#6d1b17" };
+
+const grass = (id, extras) => `
+  <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6fa8d6"/><stop offset="1" stop-color="#c9e1f2"/></linearGradient></defs>
+  <rect width="400" height="260" fill="url(#${id})"/>
+  ${extras ? `<circle cx="330" cy="50" r="22" fill="#f7e08a"/>
+  <g fill="#fff" opacity=".9"><ellipse cx="90" cy="52" rx="34" ry="12"/><ellipse cx="114" cy="44" rx="22" ry="12"/></g>` : ""}
+  <path d="M0 150 C 80 138 160 146 240 140 C 300 136 360 142 400 138 L400 260 L0 260 Z" fill="#6aa04a"/>
+  <rect y="180" width="400" height="80" fill="#5b9140"/>
+  ${extras ? `<rect x="58" y="96" width="8" height="52" fill="#6a4a30"/><circle cx="62" cy="88" r="24" fill="#3f7a35"/>` : ""}`;
+
+const apple = (cx, cy, s = 1, body = "#c62f2a", hi = "#e8746b") => `
+  <g transform="translate(${cx} ${cy}) scale(${s})">
+    <ellipse cy="22" rx="30" ry="6" fill="#000" opacity=".18"/>
+    <path d="M0 -18 C 22 -32 40 -10 34 8 C 30 24 14 30 0 24 C -14 30 -30 24 -34 8 C -40 -10 -22 -32 0 -18 Z" fill="${body}"/>
+    <ellipse cx="-14" cy="-6" rx="7" ry="10" fill="${hi}" opacity=".55"/>
+    <path d="M0 -18 C 1 -28 3 -34 6 -38" stroke="#4d3220" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M6 -34 C 16 -42 26 -38 28 -32 C 18 -28 10 -30 6 -34 Z" fill="#4f8a3a"/>
+  </g>`;
+const pear = (cx, cy) => `
+  <g transform="translate(${cx} ${cy})">
+    <ellipse cy="34" rx="30" ry="6" fill="#000" opacity=".18"/>
+    <ellipse cy="12" rx="30" ry="26" fill="#c3c24a"/><ellipse cy="-16" rx="16" ry="22" fill="#c3c24a"/>
+    <ellipse cx="-10" cy="6" rx="7" ry="12" fill="#e0df8a" opacity=".6"/>
+    <path d="M0 -36 C 0 -44 2 -50 6 -54" stroke="#4d3220" stroke-width="3" fill="none" stroke-linecap="round"/>
+  </g>`;
+const chair = (x, y, s = 1) => `
+  <g transform="translate(${x} ${y}) scale(${s})" fill="#9b6a3f" stroke="#6e4728" stroke-width="2">
+    <rect x="10" y="0" width="10" height="110"/><rect x="76" y="0" width="10" height="110"/>
+    <rect x="10" y="4" width="76" height="10"/><rect x="10" y="28" width="76" height="8"/>
+    <rect x="0" y="62" width="98" height="14"/>
+    <rect x="4" y="76" width="9" height="56"/><rect x="86" y="76" width="9" height="56"/>
+    <rect x="36" y="76" width="8" height="40"/><rect x="56" y="76" width="8" height="40"/>
+  </g>`;
+const tree = (x, y, s) => `
+  <g transform="translate(${x} ${y}) scale(${s})">
+    <rect x="-6" y="-52" width="12" height="54" fill="#6a4a30"/>
+    <circle cx="-24" cy="-62" r="22" fill="#3f7a35"/><circle cx="24" cy="-62" r="22" fill="#3f7a35"/>
+    <circle cx="0" cy="-82" r="30" fill="#3f7a35"/><circle cx="-8" cy="-90" r="12" fill="#57924a"/>
+  </g>`;
+const man = (x, y, s, hx, hy) => `
+  <g transform="translate(${x} ${y}) scale(${s})">
+    <rect x="-13" y="-48" width="11" height="48" rx="3" fill="#2b2f33"/><rect x="2" y="-48" width="11" height="48" rx="3" fill="#2b2f33"/>
+    <rect x="-21" y="-106" width="42" height="64" rx="9" fill="#3d5a73"/>
+    <line x1="14" y1="-96" x2="${hx}" y2="${hy}" stroke="#3d5a73" stroke-width="9" stroke-linecap="round"/>
+    <circle cx="0" cy="-120" r="14" fill="#d9a982"/>
+    <path d="M-14 -122 a14 14 0 0 1 28 0 z" fill="#3b2a1d"/>
+  </g>`;
+const umbrella = (cx, yb, r, shaftEnd, w, hook) => {
+  const h = r * 0.62, top = yb - h;
+  return `<line x1="${cx}" y1="${top}" x2="${cx}" y2="${shaftEnd}" stroke="#2b2f33" stroke-width="${w}"/>
+  ${hook ? `<path d="M${cx} ${shaftEnd} q0 ${w*4} ${w*3} ${w*4} q${w*3} 0 ${w*3} ${-w*2.5}" fill="none" stroke="#2b2f33" stroke-width="${w}" stroke-linecap="round"/>` : ""}
+  <path d="M${cx - r} ${yb} A${r} ${h} 0 0 1 ${cx + r} ${yb} Z" fill="#b5332e"/>
+  ${[-0.5, 0.5].map(k => `<line x1="${cx}" y1="${top}" x2="${cx + k * r}" y2="${yb}" stroke="#8e2420" stroke-width="${w * 0.8}"/>`).join("")}
+  <line x1="${cx}" y1="${top}" x2="${cx}" y2="${top - w * 3}" stroke="#2b2f33" stroke-width="${w}" stroke-linecap="round"/>`;
+};
+const rain = (n, ymax) => Array.from({ length: n }, (_, i) => {
+  const x = (i * 53 + 17) % 400, y = (i * 37) % ymax;
+  return `<line x1="${x}" y1="${y}" x2="${x - 5}" y2="${y + 14}" stroke="#eef3f6" stroke-width="1.6" opacity=".75"/>`;
+}).join("");
+const street = `<rect width="400" height="260" fill="#b7c2ca"/><rect y="206" width="400" height="54" fill="#8b959d"/><ellipse cx="310" cy="238" rx="46" ry="6" fill="#a5b0b8"/>`;
+const banana = `
+  <g transform="translate(200 166)">
+    <ellipse cy="16" rx="58" ry="7" fill="#000" opacity=".16"/>
+    <path d="M-62 -6 C -40 26 34 30 62 -14 C 64 -18 60 -20 56 -16 C 30 12 -36 10 -56 -12 Z" fill="#f2d24b" stroke="#c9a62a" stroke-width="2"/>
+    <path d="M56 -16 L 64 -24" stroke="#5b4a1e" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="-60" cy="-9" r="3" fill="#5b4a1e"/>
+  </g>`;
+
+const SCENES = {
+  chairRich: svg(grass("skyA1", true) + chair(160, 88), "A wooden chair on grass under a sky with a sun, a cloud and a tree"),
+  chairBare: svg(grass("skyA2", false) + chair(160, 88), "A wooden chair on grass under a bare sky"),
+  penguin: svg(`
+    <rect width="400" height="260" fill="#d7e6f0"/>
+    <path d="M0 168 C 90 160 180 172 260 164 C 320 158 370 166 400 162 L400 260 L0 260 Z" fill="#f5f8fb"/>
+    <path d="M0 200 C 120 194 260 206 400 198 L400 260 L0 260 Z" fill="#e8eff5"/>
+    <ellipse cx="200" cy="214" rx="46" ry="7" fill="#7a95ab" opacity=".25"/>
+    <g transform="translate(200 140)">
+      <ellipse cx="-32" cy="8" rx="10" ry="34" fill="#1f2328" transform="rotate(14 -32 8)"/>
+      <ellipse cx="32" cy="8" rx="10" ry="34" fill="#1f2328" transform="rotate(-14 32 8)"/>
+      <ellipse cx="0" cy="0" rx="36" ry="64" fill="#1f2328"/>
+      <ellipse cx="0" cy="14" rx="25" ry="48" fill="#f7f7f5"/>
+      <circle cx="-10" cy="-46" r="5" fill="#fff"/><circle cx="10" cy="-46" r="5" fill="#fff"/>
+      <circle cx="-10" cy="-46" r="2.4" fill="#111"/><circle cx="10" cy="-46" r="2.4" fill="#111"/>
+      <polygon points="-6,-38 6,-38 0,-28" fill="#e39a2d"/>
+      <ellipse cx="-12" cy="68" rx="11" ry="5" fill="#e39a2d"/><ellipse cx="12" cy="68" rx="11" ry="5" fill="#e39a2d"/>
+    </g>`, "A penguin standing on snow"),
+  sparrow: svg(`
+    <rect width="400" height="260" fill="#dfe9d8"/>
+    <g fill="#c7dbbd"><circle cx="60" cy="50" r="40"/><circle cx="340" cy="70" r="55"/><circle cx="300" cy="226" r="45"/></g>
+    <path d="M30 190 C 140 170 260 160 380 128" stroke="#6e4728" stroke-width="12" fill="none" stroke-linecap="round"/>
+    <path d="M300 148 C 316 128 330 120 350 118" stroke="#6e4728" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <g fill="#5f8f45"><ellipse cx="354" cy="114" rx="14" ry="7" transform="rotate(-20 354 114)"/><ellipse cx="100" cy="176" rx="14" ry="7" transform="rotate(20 100 176)"/></g>
+    <g transform="translate(200 128)">
+      <line x1="-8" y1="22" x2="-11" y2="30" stroke="#4d3220" stroke-width="3"/>
+      <line x1="8" y1="22" x2="6" y2="30" stroke="#4d3220" stroke-width="3"/>
+      <polygon points="-40,-6 -78,-22 -74,4" fill="#7c5434"/>
+      <ellipse cx="0" cy="0" rx="44" ry="28" fill="#9a6b45"/>
+      <ellipse cx="6" cy="10" rx="30" ry="16" fill="#d9c3a2"/>
+      <ellipse cx="-10" cy="-4" rx="26" ry="15" fill="#7c5434"/>
+      <circle cx="36" cy="-20" r="20" fill="#9a6b45"/>
+      <polygon points="54,-24 70,-19 54,-14" fill="#3b2a1d"/>
+      <circle cx="42" cy="-24" r="3.2" fill="#111"/>
+    </g>`, "A small brown bird perched on a branch"),
+  trees: svg(`
+    <defs><linearGradient id="skyB3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8db7d8"/><stop offset="1" stop-color="#e6eff5"/></linearGradient></defs>
+    <rect width="400" height="260" fill="url(#skyB3)"/>
+    <path d="M0 178 C 100 170 220 180 400 172 L400 260 L0 260 Z" fill="#9bbf68"/>
+    <path d="M0 214 C 140 208 260 218 400 210 L400 260 L0 260 Z" fill="#8db35c"/>
+    <ellipse cx="150" cy="183" rx="34" ry="5" fill="#2f4a22" opacity=".18"/><ellipse cx="284" cy="180" rx="26" ry="4" fill="#2f4a22" opacity=".18"/>
+    ${tree(150, 182, 1)}${tree(284, 179, .78)}`, "Two trees in an open field"),
+  applePear: svg(room() + apple(160, 162) + pear(250, 150), "An apple and a pear on a wooden table"),
+  appleAlone: svg(room() + apple(200, 160, 1.15), "An apple on a wooden table"),
+  umbrellaGiant: svg(street + rain(46, 200) + umbrella(200, 136, 190, 176, 4, false) + man(193.6, 214, .32, 20, -126), "A giant red umbrella filling the frame above a tiny man"),
+  umbrellaNormal: svg(street + rain(46, 200) + umbrella(200, 86, 62, 118, 3, true) + man(180, 236, 1, 20, -126), "A man holding a red umbrella"),
+  banana: svg(room() + banana, "A banana on a wooden table"),
+  appleRedRoom: svg(room(RED_ROOM) + apple(200, 160, 1.15, "#e23a31", "#f39087"), "A red apple on a red table in a red room"),
+};
+
+/* ===================== Taxonomy ===================== */
+const CATS = {
+  A:  { l:"A",  name:"Forced completion",   def:"The prompt leaves a dimension open and the image has to fill it, here with a typical value." },
+  Ap: { l:"A′", name:"Atypical completion", def:"The same forced dimension, filled with a valid but atypical value." },
+  B:  { l:"B",  name:"Implied content",     def:"Content the prompt never names but entails or excludes." },
+  C:  { l:"C",  name:"Optional addition",   def:"Content that nothing in the prompt requires." },
+  D:  { l:"D",  name:"Salience",            def:"Nothing is added or removed; what changes is what the image is about." },
+  E:  { l:"E",  name:"Control",             def:"Checks that annotators pay attention." },
+  G:  { l:"G",  name:"Generator-specific",  def:"Extra content typical of diffusion outputs. Lower priority." },
+};
+const ORDER = ["A", "Ap", "B", "C", "D", "E", "G"];
+const P = (lvl, label) => ({ lvl, label });
+
+const CASES = [
+  { cat:"A",  id:"A1",  name:"Unspecified attribute", def:"The image picks a value for a property the prompt leaves open.", prompt:"an apple", img:"a green apple", pair:"A red apple; ratings should not differ", anchor:"Underspecification", pen:P(0,"none"), pilot:"S01" },
+  { cat:"A",  id:"A2",  name:"Background / scene", def:"Some background has to exist.", prompt:"a chair on the grass", img:"sky, sun, cloud, tree", pair:"Same scene with a bare sky", anchor:"Underspecification", pen:P(0,"none"), pilot:"S02" },
+  { cat:"A",  id:"A3",  name:"Viewpoint / framing", def:"An angle, a scale and a medium must be chosen.", prompt:"a cup of coffee", img:"seen from directly above", pair:"Same cup, side view", anchor:"Underspecification", pen:P(0,"none"), pilot:"S03" },
+  { cat:"Ap", id:"A′1", name:"Atypical category member", def:"A valid but atypical member of the named category.", prompt:"a bird", img:"a penguin", pair:"A sparrow", anchor:"Prototype theory (Rosch)", pen:P(null,"graded by typicality"), pilot:null },
+  { cat:"Ap", id:"A′2", name:"Atypical context", def:"A real but unusual setting for the subject.", prompt:"a polar bear", img:"in a desert", pair:"On sea ice", anchor:"Scene schema, typicality", pen:P(1.5,"low to medium"), pilot:null },
+  { cat:"Ap", id:"A′3", name:"Counterfactual attribute", def:"A value the category never takes.", prompt:"an apple", img:"a blue apple", pair:"A red apple", anchor:"Prototype theory", pen:P(2,"medium"), pilot:null },
+  { cat:"B",  id:"B1",  name:"Implied presence, realized", def:"Content the prompt entails is shown.", prompt:"a birthday cake", img:"lit candles", pair:"Same cake without candles (B2)", anchor:"Scripts, bridging inference", pen:P(0,"none, possible bonus"), pilot:"S04" },
+  { cat:"B",  id:"B2",  name:"Implied presence, missing", def:"Content the prompt entails is absent.", prompt:"a birthday cake", img:"no candles", pair:"Same cake with candles (B1)", anchor:"Scripts, bridging inference", pen:P(1.5,"low to medium"), pilot:null },
+  { cat:"B",  id:"B3",  name:"Implied absence, violated", def:"A word in the prompt excludes content that appears anyway.", prompt:"a lonely tree in a field", img:"a second tree", pair:"Same image under “a tree in a field”", anchor:"Implicit (lexical) negation", pen:P(3,"high"), pilot:null },
+  { cat:"C",  id:"C1",  name:"Typical context object", def:"Plausible in the scene, but optional.", prompt:"a laptop on a desk", img:"a desk lamp and a mug", pair:"The laptop alone", anchor:"Scene schema", pen:P(1,"low"), pilot:"S05" },
+  { cat:"C",  id:"C2",  name:"Competing object", def:"Same level and salience as the named subject.", prompt:"an apple", img:"an apple and a pear", pair:"The apple alone", anchor:"Gricean quantity (exhaustivity)", pen:P(2,"medium, high disagreement"), pilot:"S06, S11" },
+  { cat:"C",  id:"C3",  name:"Extra instance", def:"More than one of the named entity.", prompt:"a chair on the grass", img:"two chairs", pair:"One chair", anchor:"Scalar implicature (cardinality)", pen:P(3,"high"), pilot:"S07" },
+  { cat:"C",  id:"C4",  name:"Extra instance × relation", def:"An extra instance makes a stated relation ambiguous.", prompt:"a cat to the left of a dog", img:"two dogs, the cat between them", pair:"One dog, to the right of the cat", anchor:"Uniqueness presupposition", pen:P(2.5,"medium to high"), pilot:null },
+  { cat:"C",  id:"C5",  name:"Added relation", def:"The named objects are right; the relation is invented.", prompt:"a cat and a box", img:"the cat inside the box", pair:"The cat next to the box", anchor:"Relation hallucination", pen:P(1.5,"low to medium"), pilot:"S08" },
+  { cat:"C",  id:"C6",  name:"Modified subject", def:"An accessory or a state change on the named entity itself.", prompt:"a dog", img:"a dog wearing sunglasses", pair:"The same dog without them", anchor:"Category boundaries, object state", pen:P(null,"graded: accessory below state change"), pilot:null },
+  { cat:"C",  id:"C7",  name:"Semantic violation", def:"An object that does not belong in the scene.", prompt:"an apple on a table", img:"a traffic cone", pair:"The apple alone", anchor:"Scene grammar, semantic (Võ)", pen:P(3,"high"), pilot:"S09" },
+  { cat:"C",  id:"C8",  name:"Syntactic violation", def:"A plausible object in an impossible position.", prompt:"an apple on a table", img:"a mug floating above the table", pair:"The mug resting on the table", anchor:"Scene grammar, syntactic (Võ)", pen:P(3,"high, may be read as quality"), pilot:null },
+  { cat:"C",  id:"C9",  name:"Added animate agent", def:"A person or an animal added to the scene.", prompt:"a park bench", img:"a person sitting on it", pair:"A bag of the same size on the bench", anchor:"Animacy captures attention", pen:P(2,"medium, above C1"), pilot:null },
+  { cat:"D",  id:"D1",  name:"Subject too small", def:"The named subject fills little of the frame.", prompt:"a sailboat", img:"a tiny boat on the horizon", pair:"The boat filling the frame", anchor:"Visual salience", pen:P(2,"medium"), pilot:"S10" },
+  { cat:"D",  id:"D2",  name:"Inverted salience hierarchy", def:"The head noun or first-mentioned entity is visually minor.", prompt:"a man with an umbrella", img:"a giant umbrella, a tiny man", pair:"Normal proportions; or one image under “a cat and a dog” and “a dog and a cat”", anchor:"Order of mention and salience (Clarke et al., 2015)", pen:P(1.5,"low to medium, open"), pilot:null },
+  { cat:"E",  id:"E1",  name:"Attention check", def:"The requested object is absent.", prompt:"a banana", img:"an apple", pair:"A banana", anchor:"Annotator quality", pen:P(3,"rating 1 expected"), pilot:"S12" },
+  { cat:"G",  id:"G1",  name:"Attribute spill-over", def:"An explicit attribute bleeds into unmentioned content.", prompt:"a red apple", img:"a red table and a red wall", pair:"The red apple in a neutral room", anchor:"Semantic leakage", pen:P(1.5,"low to medium"), pilot:null },
+  { cat:"G",  id:"G2",  name:"Double sense", def:"Both senses of a homonym appear.", prompt:"a bat", img:"the animal and a baseball bat", pair:"The animal only", anchor:"Homonym duplication (Rassin et al., 2022)", pen:P(2,"medium"), pilot:null },
+  { cat:"G",  id:"G3",  name:"Depicted instance", def:"The subject appears only as a picture, a print or a word.", prompt:"an apple", img:"a poster of an apple on a wall", pair:"A real apple", anchor:"Depiction vs instance", pen:P(3,"high"), pilot:null },
+  { cat:"G",  id:"G4",  name:"Generator artefacts", def:"Pseudo-text, a watermark or a signature.", prompt:"a chair on the grass", img:"pseudo-text in a corner", pair:"The clean image", anchor:"Alignment vs quality", pen:P(1,"low on alignment"), pilot:null },
+];
+
+const AXES = [
+  { name:"Exhaustivity", levels:"“apple” · “an apple” · “a single apple” · “an apple among other fruit”", with:"C2, C3", tests:"If cancelling the implicature removes the penalty, the effect is pragmatic rather than semantic.", pilot:null },
+  { name:"Prompt specificity", levels:"“an apple” · “a red apple on a wooden table”", with:"C1–C9", tests:"Whether detailed prompts are read as exhaustive.", pilot:"S06 ↔ S11" },
+  { name:"Prompt register", levels:"Sentence · tag list (“apple, wooden table, 4k”)", with:"C3, D2", tests:"Tag lists have no article and no head noun, so no cardinality implicature and no syntactic hierarchy.", pilot:null },
+  { name:"Prompt type", levels:"Object prompt (“a mug”) · scene prompt (“a kitchen”)", with:"C1, C7, C8", tests:"How much unmentioned content a scene schema licenses.", pilot:null },
+  { name:"Animacy", levels:"Inanimate · animate addition of matched size", with:"C1–C3, C9", tests:"Whether animate additions are penalized more.", pilot:null },
+  { name:"Dose", levels:"0 · 1 · 3 · 10 added objects; small · large area", with:"C1, C2", tests:"A penalty curve instead of a binary effect.", pilot:null },
+  { name:"Reference zero", levels:"Subject alone on a neutral background", with:"A, C", tests:"A floor for measuring the effect of any completion.", pilot:null },
+];
+
+const EXAMPLES = [
+  { cat:"A", id:"A2", name:"Background / scene", change:"Unmentioned background objects: sun, cloud and tree.", pen:P(0,"none expected"),
+    v:[ { tab:"Test", prompt:"a chair on the grass", scene:"chairRich", note:"The image adds a sun, a cloud and a tree." },
+        { tab:"Minimal pair", prompt:"a chair on the grass", scene:"chairBare", note:"Same chair and grass under a bare sky." } ] },
+  { cat:"Ap", id:"A′1", name:"Atypical category member", change:"How typical the bird is.", pen:P(null,"graded by typicality"),
+    v:[ { tab:"Test", prompt:"a bird", scene:"penguin", note:"A penguin is a bird, but an atypical one." },
+        { tab:"Minimal pair", prompt:"a bird", scene:"sparrow", note:"A sparrow, close to the prototype." } ] },
+  { cat:"B", id:"B3", name:"Implied absence, violated", change:"Only the text. “Lonely” rules out a second tree.", pen:P(3,"high for “lonely”, low for the neutral text"),
+    v:[ { tab:"Test", prompt:"a lonely tree in a field", scene:"trees", note:"The second tree contradicts “lonely”." },
+        { tab:"Minimal pair", prompt:"a tree in a field", scene:"trees", note:"Same image; the neutral text allows a second tree." } ] },
+  { cat:"C", id:"C2", name:"Competing object", change:"A pear of the same size and salience as the apple.", pen:P(2,"medium, high disagreement"),
+    v:[ { tab:"Test", prompt:"an apple", scene:"applePear", note:"An apple and a pear side by side." },
+        { tab:"Minimal pair", prompt:"an apple", scene:"appleAlone", note:"The pear is removed; everything else stays." } ] },
+  { cat:"D", id:"D2", name:"Inverted salience hierarchy", change:"Relative size of the head noun (man) and its complement (umbrella).", pen:P(1.5,"low to medium, open"),
+    v:[ { tab:"Test", prompt:"a man with an umbrella", scene:"umbrellaGiant", note:"The umbrella fills the frame and the man is tiny." },
+        { tab:"Minimal pair", prompt:"a man with an umbrella", scene:"umbrellaNormal", note:"Same elements in normal proportions." } ] },
+  { cat:"E", id:"E1", name:"Attention check", change:"The requested object is replaced by another one.", pen:P(3,"rating 1 expected"),
+    v:[ { tab:"Test", prompt:"a banana", scene:"appleAlone", note:"An apple where a banana was asked for." },
+        { tab:"Minimal pair", prompt:"a banana", scene:"banana", note:"The banana." } ] },
+  { cat:"G", id:"G1", name:"Attribute spill-over", change:"“Red” bleeds into the table and the wall.", pen:P(1.5,"low to medium"),
+    v:[ { tab:"Test", prompt:"a red apple", scene:"appleRedRoom", note:"Table and wall turn red as well." },
+        { tab:"Minimal pair", prompt:"a red apple", scene:"appleAlone", note:"The same apple in a neutral room." } ] },
+];
+
+/* ===================== Rendering ===================== */
+const bars = p => p.lvl === null
+  ? `<span class="bars open"><i></i><i></i><i></i></span>`
+  : `<span class="bars">${[1, 2, 3].map(i => `<i class="${p.lvl >= i ? "f" : p.lvl >= i - 0.5 ? "h" : ""}"></i>`).join("")}</span>`;
+const pen = p => `<div class="pen">${bars(p)}<span>${p.label}</span></div>`;
+const status = s => s ? `<span class="st pilot">Pilot · ${s}</span>` : `<span class="st new">New</span>`;
+
+const nPilot = CASES.filter(c => c.pilot).length;
+document.getElementById("stats").innerHTML = [
+  [CASES.length, "cases"], [ORDER.length, "categories"], [AXES.length, "cross-cutting axes"],
+  [nPilot, "already in the pilot"], [CASES.length - nPilot, "new"],
+].map(([n, l]) => `<span class="stat"><b>${n}</b> ${l}</span>`).join("");
+
+let filt = "all";
+const FILTERS = [["all", `All (${CASES.length})`], ["pilot", `In pilot (${nPilot})`], ["new", `New (${CASES.length - nPilot})`]];
+const filterEl = document.getElementById("filter");
+filterEl.innerHTML = FILTERS.map(([k, l]) => `<button type="button" data-f="${k}" aria-pressed="${k === filt}">${l}</button>`).join("");
+filterEl.addEventListener("click", e => {
+  const b = e.target.closest("button[data-f]"); if (!b) return;
+  filt = b.dataset.f;
+  filterEl.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  renderCases();
+});
+
+function renderCases() {
+  const rows = [];
+  ORDER.forEach(k => {
+    const list = CASES.filter(c => c.cat === k && (filt === "all" || (filt === "pilot" ? c.pilot : !c.pilot)));
+    if (!list.length) return;
+    const c = CATS[k];
+    rows.push(`<tr class="grp"><td colspan="7"><div class="grp-h"><span class="cl bg-${k}">${c.l}</span><b>${c.name}</b><span class="d">${c.def}</span></div></td></tr>`);
+    list.forEach(r => rows.push(`<tr>
+      <td class="id">${r.id}</td>
+      <td><div class="nm">${r.name}</div><div class="def">${r.def}</div></td>
+      <td><q>${r.prompt}</q><div class="to">→ ${r.img}</div></td>
+      <td>${r.pair}</td>
+      <td class="anc">${r.anchor}</td>
+      <td>${pen(r.pen)}</td>
+      <td>${status(r.pilot)}</td></tr>`));
+  });
+  document.getElementById("cases-body").innerHTML = rows.join("");
+}
+
+document.getElementById("axes-body").innerHTML = AXES.map(a => `<tr>
+  <td class="nm">${a.name}</td><td>${a.levels}</td><td class="id">${a.with}</td><td>${a.tests}</td><td>${status(a.pilot)}</td></tr>`).join("");
+
+const gallery = document.getElementById("gallery");
+function card(ex, i) {
+  const c = CATS[ex.cat], on = ex.on || 0, v = ex.v[on];
+  return `<article class="ex" id="ex-${i}">
+    <div class="fig">
+      <div class="img">${SCENES[v.scene]}</div>
+      <div class="seg" role="group" aria-label="Variant">${ex.v.map((w, j) =>
+        `<button type="button" data-ex="${i}" data-v="${j}" aria-pressed="${on === j}">${w.tab}</button>`).join("")}</div>
+    </div>
+    <div class="txt">
+      <div class="eyebrow fg-${ex.cat}">${c.l} · ${c.name}</div>
+      <h3>${ex.id} · ${ex.name}</h3>
+      <q class="big">${v.prompt}</q>
+      <p class="note">${v.note}</p>
+      <dl><dt>What changes</dt><dd>${ex.change}</dd><dt>Prediction</dt><dd>${pen(ex.pen)}</dd></dl>
+    </div>
+  </article>`;
+}
+gallery.innerHTML = EXAMPLES.map(card).join("");
+gallery.addEventListener("click", e => {
+  const b = e.target.closest("button[data-ex]"); if (!b) return;
+  const i = +b.dataset.ex, j = +b.dataset.v;
+  EXAMPLES[i].on = j;
+  document.getElementById("ex-" + i).outerHTML = card(EXAMPLES[i], i);
+  const next = document.querySelector(`#ex-${i} button[data-v="${j}"]`);
+  if (next) next.focus();
+});
+
+renderCases();
+</script>

@@ -1,0 +1,6 @@
+<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg" role="img">
+    <defs><linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9cc3df"/><stop offset="1" stop-color="#e3eef5"/></linearGradient></defs>
+    <rect width="400" height="260" fill="url(#sea)"/>
+    <rect y="150" width="400" height="110" fill="#3f78a2"/>
+    <line x1="20" y1="170" x2="140" y2="170" stroke="#6b9cc0" stroke-width="2"/><line x1="230" y1="178" x2="360" y2="178" stroke="#6b9cc0" stroke-width="2"/><line x1="50" y1="190" x2="180" y2="190" stroke="#6b9cc0" stroke-width="2"/><line x1="220" y1="198" x2="354" y2="198" stroke="#6b9cc0" stroke-width="2"/><line x1="80" y1="214" x2="220" y2="214" stroke="#6b9cc0" stroke-width="2"/><line x1="210" y1="222" x2="348" y2="222" stroke="#6b9cc0" stroke-width="2"/><line x1="110" y1="240" x2="260" y2="240" stroke="#6b9cc0" stroke-width="2"/><line x1="200" y1="248" x2="342" y2="248" stroke="#6b9cc0" stroke-width="2"/>
+    <g transform="translate(318 146)"><polygon points="-7,0 7,0 5,3 -5,3" fill="#2b2f33"/><polygon points="0,-12 0,-1 6,-1" fill="#fff"/><line x1="0" y1="-12" x2="0" y2="0" stroke="#2b2f33" stroke-width="1"/></g></svg>

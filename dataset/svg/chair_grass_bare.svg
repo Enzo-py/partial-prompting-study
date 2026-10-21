@@ -1,0 +1,14 @@
+<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A wooden chair on grass under a bare sky">
+  <defs><linearGradient id="skyA2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6fa8d6"/><stop offset="1" stop-color="#c9e1f2"/></linearGradient></defs>
+  <rect width="400" height="260" fill="url(#skyA2)"/>
+  
+  <path d="M0 150 C 80 138 160 146 240 140 C 300 136 360 142 400 138 L400 260 L0 260 Z" fill="#6aa04a"/>
+  <rect y="180" width="400" height="80" fill="#5b9140"/>
+  
+  <g transform="translate(160 88) scale(1)" fill="#9b6a3f" stroke="#6e4728" stroke-width="2">
+    <rect x="10" y="0" width="10" height="110"/><rect x="76" y="0" width="10" height="110"/>
+    <rect x="10" y="4" width="76" height="10"/><rect x="10" y="28" width="76" height="8"/>
+    <rect x="0" y="62" width="98" height="14"/>
+    <rect x="4" y="76" width="9" height="56"/><rect x="86" y="76" width="9" height="56"/>
+    <rect x="36" y="76" width="8" height="40"/><rect x="56" y="76" width="8" height="40"/>
+  </g></svg>

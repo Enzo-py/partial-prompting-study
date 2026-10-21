@@ -1,0 +1,22 @@
+<svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg" role="img">
+  <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6fa8d6"/><stop offset="1" stop-color="#c9e1f2"/></linearGradient></defs>
+  <rect width="400" height="260" fill="url(#sky)"/>
+  <circle cx="330" cy="50" r="22" fill="#f7e08a"/>
+  <g fill="#fff" opacity=".9"><ellipse cx="90" cy="52" rx="34" ry="12"/><ellipse cx="114" cy="44" rx="22" ry="12"/></g>
+  <path d="M0 150 C 80 138 160 146 240 140 C 300 136 360 142 400 138 L400 260 L0 260 Z" fill="#6aa04a"/>
+  <rect y="180" width="400" height="80" fill="#5b9140"/>
+  <rect x="58" y="96" width="8" height="52" fill="#6a4a30"/><circle cx="62" cy="88" r="24" fill="#3f7a35"/>
+  <g transform="translate(80 92) scale(0.95)" fill="#9b6a3f" stroke="#6e4728" stroke-width="2">
+    <rect x="10" y="0" width="10" height="110"/><rect x="76" y="0" width="10" height="110"/>
+    <rect x="10" y="4" width="76" height="10"/><rect x="10" y="28" width="76" height="8"/>
+    <rect x="0" y="62" width="98" height="14"/>
+    <rect x="4" y="76" width="9" height="56"/><rect x="86" y="76" width="9" height="56"/>
+    <rect x="36" y="76" width="8" height="40"/><rect x="56" y="76" width="8" height="40"/>
+  </g>
+  <g transform="translate(240 88) scale(1)" fill="#9b6a3f" stroke="#6e4728" stroke-width="2">
+    <rect x="10" y="0" width="10" height="110"/><rect x="76" y="0" width="10" height="110"/>
+    <rect x="10" y="4" width="76" height="10"/><rect x="10" y="28" width="76" height="8"/>
+    <rect x="0" y="62" width="98" height="14"/>
+    <rect x="4" y="76" width="9" height="56"/><rect x="86" y="76" width="9" height="56"/>
+    <rect x="36" y="76" width="8" height="40"/><rect x="56" y="76" width="8" height="40"/>
+  </g></svg>
