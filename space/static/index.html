@@ -56,6 +56,12 @@ h1{font:600 28px/1.2 var(--display);margin:0 0 12px;text-wrap:balance}
 .opt input:focus-visible + label{outline:2px solid var(--accent);outline-offset:2px}
 .marks{display:flex;gap:10px;align-items:center;font-size:13px;color:var(--muted)}
 .nav{display:flex;justify-content:flex-end;gap:10px}
+.fb{display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--line);padding-top:20px}
+.fbcase{display:grid;grid-template-columns:minmax(0,220px) 1fr;gap:16px;align-items:start;margin-top:4px}
+.fbtext{display:flex;flex-direction:column;gap:6px}
+.fbtext .lbl{font:500 12px var(--mono);color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.fbtext q{font:500 19px/1.3 var(--display);quotes:"“" "”"}
+@media (max-width:480px){.fbcase{grid-template-columns:1fr}}
 button.b{font:500 14px var(--body);border-radius:7px;padding:10px 18px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
 button.b.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
 button.b:disabled{opacity:.4;cursor:not-allowed}
@@ -194,17 +200,51 @@ async function submit() {
     const res = await fetch("/api/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     if (!res.ok) throw new Error(res.status);
     const out = await res.json();
+    // No automatic redirect: participants get time to read the feedback, then continue themselves.
     show(`<div class="prompt"><span class="lbl">Done</span><q>Thank you</q></div>
       <p>Your answers have been saved.</p>
-      ${out.completion_code ? `<p>Your completion code:</p><div class="code">${esc(out.completion_code)}</div>
-        <p class="muted">You will be redirected to Prolific in a few seconds.</p>` : `<p class="muted">You can close this page.</p>`}`);
-    if (out.redirect) setTimeout(() => { location.href = out.redirect; }, 4000);
+      ${out.completion_code ? `<p>Your completion code:</p><div class="code">${esc(out.completion_code)}</div>` : ""}
+      <div id="feedback" hidden></div>
+      ${out.redirect ? `<div class="nav"><button class="b primary" id="toprolific">Back to Prolific</button></div>`
+                     : `<p class="muted">You can close this page.</p>`}`);
+    if (out.redirect) document.getElementById("toprolific").onclick = () => { location.href = out.redirect; };
+    showFeedback();
   } catch (e) {
     show(`<div class="prompt"><span class="lbl">Not saved yet</span><q>Your answers could not be sent</q></div>
       <p class="err">Check your connection, then try again. Please do not close this page.</p>
       <div class="nav"><button class="b primary" id="retry">Try again</button></div>`);
     document.getElementById("retry").onclick = submit;
   }
+}
+
+// Shown only after the answers are saved, so it cannot change them. Worded as a comparison, never as a score.
+async function showFeedback() {
+  let fb = null;
+  try {
+    const res = await fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" },
+                                               body: JSON.stringify({ session_id: SESSION.session_id, list_id: SESSION.list_id }) });
+    if (res.ok) fb = (await res.json()).feedback;
+  } catch (e) {}
+  const el = document.getElementById("feedback");
+  if (!fb || !el) return;
+  const d = fb.mean_diff, pts = v => `${Math.abs(v).toFixed(1)} point${Math.abs(v).toFixed(1) === "1.0" ? "" : "s"}`;
+  const tone = Math.abs(d) < 0.3 ? "On average, your ratings were very close to those of other participants."
+    : `On average, your ratings were ${pts(d)} ${d < 0 ? "lower" : "higher"} than other participants’: you were a little ${d < 0 ? "stricter" : "more lenient"} about what the text asks for.`;
+  const m = fb.most_different;
+  el.hidden = false;
+  el.innerHTML = `<div class="fb">
+    <div class="prompt"><span class="lbl">Your answers and others’</span></div>
+    <p>${tone}</p>
+    <p>On ${fb.n_close} of the ${fb.n_compared} images we could compare, your rating was within 1 point of the others’ average.</p>
+    ${m ? `<div class="fbcase">
+      <div class="stim"><img src="/stimuli/${encodeURIComponent(m.file_name)}" alt=""></div>
+      <div class="fbtext">
+        <span class="lbl">Where you differed most</span>
+        <q>${esc(m.prompt)}</q>
+        <p>You rated it <b>${m.rating}</b> out of 5. The other ${m.others_n} participants gave it <b>${m.others_mean.toFixed(1)}</b> on average.</p>
+        <p class="muted">Neither answer is wrong: people read the same text differently, and these differences are what this study is about.</p>
+      </div></div>` : ""}
+  </div>`;
 }
 
 async function main() {

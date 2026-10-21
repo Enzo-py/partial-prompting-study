@@ -60,7 +60,7 @@ Study URL:
 ```
 https://enzo-py-partial-prompting-study.hf.space/?PROLIFIC_PID={{%PROLIFIC_PID%}}&STUDY_ID={{%STUDY_ID%}}&SESSION_ID={{%SESSION_ID%}}
 ```
-With `PROLIFIC_COMPLETION_CODE` set, Prolific participants see the code and are redirected at the end. Without Prolific parameters (colleagues, lab pilot), the page just thanks them.
+With `PROLIFIC_COMPLETION_CODE` set, Prolific participants see the code at the end and a **Back to Prolific** button (no automatic redirect, so they have time to read their feedback). Without Prolific parameters (colleagues, lab pilot), the page just thanks them.
 
 ## Using a new version of the dataset
 
@@ -92,6 +92,12 @@ The stimuli are read once, when the Space starts. After you push new images or p
 }
 ```
 Click marks are normalized to the image (0–1 on each axis).
+
+## Feedback to participants
+
+After their answers are saved, participants see a short comparison with the other participants: whether their ratings were on average stricter or more lenient, on how many images they were within 1 point of the others' average, and the image where they differed most (shown only for a gap of at least 1 point). It is requested separately (`POST /api/feedback`), so it can never delay or change the saved answers.
+
+Safeguards: it is not announced beforehand, so it cannot push anyone to guess the "expected" answer; it is worded as a comparison, never as a score; controls are never used, so the attention check stays hidden; sessions that failed the attention check are left out of the comparison; a stimulus counts only once at least 5 other participants rated it, and nothing is shown below 3 comparable stimuli (`FEEDBACK_MIN_OTHERS`, `FEEDBACK_MIN_ITEMS` in `app.py`). The first participants therefore see no feedback. The feedback is not saved.
 
 ## Dashboard
 

@@ -403,6 +403,55 @@ def summary(key: str = "", refresh: bool = False):
     return summarize(list(load_sessions(max_age=0 if refresh else 60).values()))
 
 
+# ---------------------------------------------------------------- participant feedback
+FEEDBACK_MIN_OTHERS = 5   # a stimulus is compared only once this many other participants rated it
+FEEDBACK_MIN_ITEMS = 3    # below this many comparable stimuli, no feedback is shown
+
+
+def feedback_for(session):
+    """Compare a participant's ratings with the other participants', after their answers are saved.
+
+    Controls are never used (they would reveal the attention check), nor are sessions that failed
+    it. Returns None until enough other participants have rated this participant's stimuli.
+    """
+    others = defaultdict(list)
+    for s in load_sessions().values():
+        if s.get("session_id") == session.get("session_id") or failed_attention_check(s):
+            continue
+        for t in s.get("trials", []):
+            if t.get("rating"):
+                others[t.get("sample_id")].append(t["rating"])
+    rows = []
+    for t in session.get("trials", []):
+        st = BY_ID.get(t.get("sample_id"))
+        if st and st["role"] != "control" and t.get("rating") and len(others[st["sample_id"]]) >= FEEDBACK_MIN_OTHERS:
+            ratings = others[st["sample_id"]]
+            rows.append((st, t["rating"], mean(ratings), len(ratings)))
+    if len(rows) < FEEDBACK_MIN_ITEMS:
+        return None
+    st, rating, m, n = max(rows, key=lambda r: abs(r[1] - r[2]))
+    return {
+        "n_compared": len(rows),
+        "mean_diff": round(mean([r - m for _, r, m, _ in rows]), 2),
+        "n_close": sum(abs(r - m) <= 1 for _, r, m, _ in rows),
+        # Only a real disagreement is worth showing.
+        "most_different": {**{k: st[k] for k in PUBLIC_FIELDS}, "rating": rating,
+                           "others_mean": round(m, 1), "others_n": n} if abs(rating - m) >= 1 else None,
+    }
+
+
+@app.post("/api/feedback")
+async def feedback(req: Request):
+    body = await req.json()
+    session_id, list_id = str(body.get("session_id", "")), body.get("list_id")
+    if not session_id.isalnum() or len(session_id) > 64 or not isinstance(list_id, int):
+        raise HTTPException(400, "invalid session")
+    path = DATA_DIR / f"list{list_id:02d}" / f"{session_id}.json"
+    if not path.exists():  # feedback only for saved sessions
+        raise HTTPException(404, "session not found")
+    return {"feedback": feedback_for(json.loads(path.read_text()))}
+
+
 @app.get("/admin")
 def admin():
     return FileResponse(ROOT / "static" / "admin.html")
