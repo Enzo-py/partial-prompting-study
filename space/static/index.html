@@ -5,71 +5,71 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Image and Text Study</title>
 <link rel="stylesheet" href="/static/vendor/jspsych-7.3.4.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap">
 <style>
+/* Deliberately plain: system font, no boxes, one accent for selection and the main button. */
 :root{
-  --bg:#f3f5f7; --surface:#ffffff; --ink:#18212b; --muted:#5d6b78; --line:#d6dde4;
-  --accent:#1f5f8b; --accent-soft:#e3eef6; --warn:#a2541b; --warn-soft:#f8ebe1; --bad:#b3261e;
-  --display:"Fraunces", Georgia, serif;
-  --body:"IBM Plex Sans", system-ui, -apple-system, sans-serif;
-  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --bg:#ffffff; --ink:#1a1a1a; --muted:#6b6b6b; --line:#dcdcdc; --hover:#f4f4f4;
+  --accent:#2457a6; --accent-soft:#eef3fb; --warn:#b4530f; --bad:#b3261e;
+  --font:system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono:ui-monospace, Menlo, Consolas, monospace;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){:root{
-  --bg:#111820; --surface:#18222c; --ink:#e4eaf0; --muted:#94a3b1; --line:#2c3a47;
-  --accent:#7db4dc; --accent-soft:#1c3346; --warn:#e3a173; --warn-soft:#3a2a1f; --bad:#f2b8b5; color-scheme:dark}}
+  --bg:#161616; --ink:#ececec; --muted:#a0a0a0; --line:#3a3a3a; --hover:#212121;
+  --accent:#8ab4f8; --accent-soft:#1e2a3d; --warn:#f0a868; --bad:#f2b8b5; color-scheme:dark}}
 html,body{background:var(--bg);color:var(--ink)}
-body{margin:0;font-family:var(--body);font-size:15px;line-height:1.55}
-.jspsych-display-element{font-family:var(--body);font-size:15px;line-height:1.55;color:var(--ink)}
+body{margin:0;font-family:var(--font);font-size:16px;line-height:1.5}
+.jspsych-display-element{font-family:var(--font);font-size:16px;line-height:1.5;color:var(--ink)}
 .jspsych-content-wrapper{align-items:flex-start}
-.jspsych-content{max-width:720px;width:100%;text-align:left;margin:0 auto;padding:28px 16px 64px;box-sizing:border-box}
+.jspsych-content{max-width:640px;width:100%;text-align:left;margin:0 auto;padding:32px 16px 64px;box-sizing:border-box}
 .jspsych-content p{margin:0}
 
-.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
-.eyebrow{font:500 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.bar{flex:1;max-width:240px;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
-.bar i{display:block;height:100%;background:var(--accent)}
-h1{font:600 28px/1.2 var(--display);margin:0 0 12px;text-wrap:balance}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:22px;display:flex;flex-direction:column;gap:22px}
-.card ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+.eyebrow{font-size:13px;color:var(--muted)}
+.bar{flex:1;max-width:200px;height:3px;border-radius:2px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--muted)}
+h1{font-size:22px;font-weight:600;line-height:1.3;margin:0 0 8px}
+.card{display:flex;flex-direction:column;gap:24px}
+.card ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
 .muted{color:var(--muted)}
-.prompt{display:flex;flex-direction:column;gap:4px}
-.prompt .lbl{font:500 12px var(--mono);color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
-.prompt q{font:500 24px/1.25 var(--display);quotes:"“" "”"}
-.stim{position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--line);line-height:0;user-select:none}
+.prompt{display:flex;flex-direction:column;gap:2px}
+.prompt .lbl{font-size:13px;color:var(--muted)}
+.prompt q{font-size:22px;font-weight:600;line-height:1.3;quotes:none}
+.prompt q.text{quotes:"“" "”"}  /* quotes only around the text being rated */
+.stim{position:relative;border-radius:4px;overflow:hidden;line-height:0;user-select:none}
 .stim img{width:100%;height:auto;display:block}
-.stim.marking{cursor:crosshair;outline:3px solid var(--warn);outline-offset:-3px}
+.stim.marking{cursor:crosshair;outline:2px solid var(--warn);outline-offset:-2px}
 .stim .mk{position:absolute;width:28px;height:28px;margin:-14px 0 0 -14px;border:4px solid #ff7a1a;border-radius:50%;box-sizing:border-box;pointer-events:none}
-.stim .hint{position:absolute;left:10px;bottom:10px;line-height:1.3;background:var(--warn-soft);color:var(--warn);font:500 12px var(--body);padding:5px 9px;border-radius:5px}
-.q{display:flex;flex-direction:column;gap:10px}
-.q h3{font:600 15px var(--body);margin:0}
+.stim .hint{position:absolute;left:8px;bottom:8px;line-height:1.3;background:var(--bg);color:var(--warn);font-size:13px;padding:4px 8px;border-radius:4px}
+.q{display:flex;flex-direction:column;gap:8px}
+.q h3{font-size:16px;font-weight:600;margin:0}
 .likert{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
 .row{display:flex;gap:6px;flex-wrap:wrap}
 .row .opt{flex:1 1 90px}
 .opt{position:relative}
 .opt input{position:absolute;opacity:0;pointer-events:none}
-.opt label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:58px;padding:8px 4px;text-align:center;border:1px solid var(--line);border-radius:7px;cursor:pointer;font-size:12px;color:var(--muted);line-height:1.25;background:var(--surface)}
-.row .opt label{min-height:44px;font-size:13.5px;color:var(--ink)}
-.opt label b{font:600 17px var(--mono);color:var(--ink)}
+.opt label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:54px;padding:6px 4px;text-align:center;border:1px solid var(--line);border-radius:6px;cursor:pointer;font-size:12px;color:var(--muted);line-height:1.25}
+.opt label:hover{background:var(--hover)}
+.row .opt label{min-height:42px;font-size:14px;color:var(--ink)}
+.opt label b{font-size:17px;font-weight:600;color:var(--ink)}
 .opt input:checked + label{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
 .opt input:focus-visible + label{outline:2px solid var(--accent);outline-offset:2px}
 .marks{display:flex;gap:10px;align-items:center;font-size:13px;color:var(--muted)}
 .nav{display:flex;justify-content:flex-end;gap:10px}
-.fb{display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--line);padding-top:20px}
-.fbcase{display:grid;grid-template-columns:minmax(0,220px) 1fr;gap:16px;align-items:start;margin-top:4px}
+.fb{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:20px}
+.fbcase{display:grid;grid-template-columns:minmax(0,200px) 1fr;gap:16px;align-items:start;margin-top:4px}
 .fbtext{display:flex;flex-direction:column;gap:6px}
-.fbtext .lbl{font:500 12px var(--mono);color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
-.fbtext q{font:500 19px/1.3 var(--display);quotes:"“" "”"}
+.fbtext .lbl{font-size:13px;color:var(--muted)}
+.fbtext q{font-size:18px;font-weight:600;line-height:1.3;quotes:"“" "”"}
 @media (max-width:480px){.fbcase{grid-template-columns:1fr}}
-button.b{font:500 14px var(--body);border-radius:7px;padding:10px 18px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
-button.b.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
-button.b:disabled{opacity:.4;cursor:not-allowed}
+button.b{font:500 15px var(--font);border-radius:6px;padding:9px 18px;cursor:pointer;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+button.b.primary{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+button.b:disabled{opacity:.35;cursor:not-allowed}
 button.b:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 button.link{border:0;background:none;padding:0;color:var(--accent);text-decoration:underline;font-size:13px;cursor:pointer}
-.code{font:600 20px var(--mono);letter-spacing:.06em;padding:10px 14px;border:1px dashed var(--accent);border-radius:7px;align-self:flex-start;user-select:all}
+.code{font:600 18px var(--mono);letter-spacing:.04em;padding:8px 12px;background:var(--hover);border-radius:4px;align-self:flex-start;user-select:all}
 .err{color:var(--bad)}
-@media (max-width:480px){.opt label{font-size:11px;min-height:64px}.prompt q{font-size:21px}h1{font-size:24px}}
+@media (max-width:480px){.opt label{font-size:11px;min-height:60px}.prompt q{font-size:20px}}
 </style>
 </head>
 <body>
@@ -125,7 +125,7 @@ class StimulusPlugin {
     el.innerHTML = `
       <div class="top"><span class="eyebrow">Image ${t.index + 1} of ${t.total}</span><span class="bar"><i style="width:${100 * t.index / t.total}%"></i></span></div>
       <div class="card">
-        <div class="prompt"><span class="lbl">Text</span><q>${esc(s.prompt)}</q></div>
+        <div class="prompt"><span class="lbl">Text</span><q class="text">${esc(s.prompt)}</q></div>
         <div class="stim" id="stim"><img src="/stimuli/${encodeURIComponent(s.file_name)}" alt="" draggable="false"></div>
         <div class="q"><h3>1. How well does the image match the text?</h3>
           <div class="likert" role="radiogroup">${radios("rating", [[1,"Does not match"],[2,"Poorly"],[3,"Partly"],[4,"Mostly"],[5,"Fully matches"]], (v, l) => `<b>${v}</b>${l}`)}</div></div>
