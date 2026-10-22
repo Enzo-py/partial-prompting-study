@@ -22,7 +22,6 @@ Environment variables (set them as Space secrets / variables):
   ADMIN_KEY                 optional; protects /api/status
 """
 import json
-import math
 import os
 import random
 import threading
@@ -154,57 +153,98 @@ LABEL_FIELDS = [k for k in STIMULI[0] if k not in ("sample_id", "prompt", "file_
 PUBLIC_FIELDS = ("sample_id", "prompt", "file_name")
 
 
-def build_lists(stimuli):
-    """Group stimuli that must not be seen by the same person, then rotate through groups.
+LIST_COUNT = int(os.environ.get("LIST_COUNT", 5))   # number of counterbalanced lists
+LIST_SIZE = int(os.environ.get("LIST_SIZE", 20))    # images per list, controls included (an upper bound)
 
-    Two stimuli are grouped when they belong to the same minimal pair (pair_ids) or reuse the same
-    image (image_id). Controls are shown to everyone. Each list takes one member from every group, so
-    every comparison inside a group is between-subjects. The number of lists is the LCM of group
-    sizes, which keeps every member equally represented.
+
+def conflict(a, b):
+    """Two stimuli never go in the same list: same minimal pair, same image, or same text."""
+    return bool(set(a["pair_ids"]) & set(b["pair_ids"])) or a["image_id"] == b["image_id"] or a["prompt"] == b["prompt"]
+
+
+def design_lists(ids, neighbours, n_lists, size, seed=0, restarts=20, steps=20000):
+    """n_lists conflict-free lists of `size` items, each item shown about equally often.
+
+    Local search, deterministic for a given dataset: swap an item out of a list and another in,
+    keeping the list conflict-free, whenever exposures get more even. The two members of a pair are
+    also pushed towards equal exposure, so each comparison has balanced cells.
     """
-    parent = {s["sample_id"]: s["sample_id"] for s in stimuli}
+    pairs = [(a, b) for a in ids for b in neighbours[a] if a < b]
+    target = n_lists * size / len(ids)
 
-    def find(x):
-        while parent[x] != x:
-            parent[x] = parent[parent[x]]
-            x = parent[x]
-        return x
+    def cost(count):
+        return (sum((count[i] - target) ** 2 + (1000 if count[i] == 0 else 0) for i in ids)
+                + sum((count[a] - count[b]) ** 2 for a, b in pairs))
 
-    def union(a, b):
-        parent[find(a)] = find(b)
-
-    by_key = defaultdict(list)
-    for s in stimuli:
-        if s["role"] == "control":
+    best = None
+    for r in range(restarts):
+        rng = random.Random(seed * 1000 + r)
+        count, lists = Counter(), []
+        for _ in range(n_lists):  # greedy start: least shown items first
+            cur = set()
+            for i in sorted(ids, key=lambda i: (count[i], rng.random())):
+                if len(cur) < size and not neighbours[i] & cur:
+                    cur.add(i)
+            lists.append(cur)
+            count.update(cur)
+        if any(len(cur) < size for cur in lists):
             continue
-        for pid in s["pair_ids"]:
-            by_key["pair:" + pid].append(s["sample_id"])
-        by_key["img:" + s["image_id"]].append(s["sample_id"])
-    for members in by_key.values():
-        for m in members[1:]:
-            union(members[0], m)
-
-    groups = defaultdict(list)
-    for s in stimuli:
-        if s["role"] == "control":
-            continue
-        groups[find(s["sample_id"])].append(s["sample_id"])
-    fixed = [s["sample_id"] for s in stimuli if s["role"] == "control"]
-    rotating = []
-    for members in groups.values():
-        members.sort()
-        if len(members) == 1:
-            fixed += members
-        else:
-            rotating.append(members)
-    n_lists = math.lcm(*[len(g) for g in rotating]) if rotating else 1
-    lists = [sorted(fixed + [g[k % len(g)] for g in rotating]) for k in range(n_lists)]
-    return lists, rotating, fixed
+        c = cost(count)
+        for _ in range(steps):
+            cur = lists[rng.randrange(n_lists)]
+            out = rng.choice(sorted(cur))
+            cand = [i for i in ids if i not in cur and not neighbours[i] & (cur - {out})]
+            if not cand:
+                continue
+            new = rng.choice(cand)
+            count[out] -= 1
+            count[new] += 1
+            c2 = cost(count)
+            if c2 <= c:
+                cur.remove(out)
+                cur.add(new)
+                c = c2
+            else:
+                count[out] += 1
+                count[new] -= 1
+        if best is None or c < best[0]:
+            best = (c, [sorted(cur) for cur in lists])
+    return best[1] if best else None
 
 
-LISTS, GROUPS, FIXED = build_lists(STIMULI)
+def build_lists(stimuli):
+    """Counterbalanced lists. Controls are shown to everyone; every other stimulus goes in some lists,
+    never together with a conflicting one (see `conflict`), so each comparison is between-subjects.
+    Stimuli that conflict with a control can never be shown and are left out.
+    """
+    controls = [s["sample_id"] for s in stimuli if s["role"] == "control"]
+    ctrl = [s for s in stimuli if s["role"] == "control"]
+    excluded = [s["sample_id"] for s in stimuli
+                if s["role"] != "control" and any(conflict(s, c) for c in ctrl)]
+    pool = [s for s in stimuli if s["role"] != "control" and s["sample_id"] not in excluded]
+    ids = sorted(s["sample_id"] for s in pool)
+    neighbours = {i: set() for i in ids}
+    for a in pool:
+        for b in pool:
+            if a is not b and conflict(a, b):
+                neighbours[a["sample_id"]].add(b["sample_id"])
+    # Largest list size that still fits: there may be fewer conflict-free items than LIST_SIZE asks.
+    for size in range(min(LIST_SIZE - len(controls), len(ids)), 0, -1):
+        lists = design_lists(ids, neighbours, LIST_COUNT, size)
+        if lists:
+            break
+    else:
+        lists = [[] for _ in range(LIST_COUNT)]
+    return [sorted(controls + l) for l in lists], controls, excluded
+
+
+LISTS, CONTROLS, EXCLUDED = build_lists(STIMULI)
+EXPOSURE = Counter(i for l in LISTS for i in l)
 (ROOT / "lists.json").write_text(json.dumps(
-    {"n_lists": len(LISTS), "always_shown": FIXED, "rotating_groups": GROUPS, "lists": LISTS}, indent=2))
+    {"n_lists": len(LISTS), "always_shown": CONTROLS, "never_shown": EXCLUDED,
+     "exposure": dict(sorted(EXPOSURE.items())), "lists": LISTS}, indent=2))
+print(f"{len(LISTS)} lists of {len(LISTS[0])} images; never shown (conflict with a control): {EXCLUDED or 'none'}")
+
 
 # ---------------------------------------------------------------- persistence
 scheduler = None
