@@ -109,6 +109,7 @@ const $ = (s, el = document) => el.querySelector(s);
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt = (v, d = 2) => v == null ? "–" : (+v).toFixed(d);
 const pct = v => v == null ? "–" : Math.round(v * 100) + "%";
+const FLAG = {attention_check: "Attention check", too_fast: "Under 1 s on an image", same_answers: "Same rating everywhere"};
 const when = iso => iso ? new Date(iso).toLocaleString(undefined, {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"}) : "–";
 
 const params = new URLSearchParams(location.search);
@@ -153,7 +154,7 @@ function render() {
   <div class="tiles">
     <div class="tile"><span class="eyebrow">Completed</span><b>${t.completed}</b><span class="note">sessions saved</span></div>
     <div class="tile"><span class="eyebrow">In progress</span><b>${t.in_progress}</b><span class="note">started in the last 30 min</span></div>
-    <div class="tile"><span class="eyebrow">Excluded</span><b>${t.excluded}</b><span class="note">failed the attention check</span></div>
+    <div class="tile"><span class="eyebrow">Excluded</span><b>${t.excluded}</b><span class="note">${t.excluded ? Object.entries(t.excluded_by).map(([f, n]) => `${FLAG[f] || f} ${n}`).join(" · ") : "failed a quality filter"}</span></div>
     <div class="tile"><span class="eyebrow">Median time</span><b>${t.median_minutes == null ? "–" : fmt(t.median_minutes, 1) + " min"}</b><span class="note">per completed session</span></div>
   </div>
 
@@ -202,12 +203,12 @@ function render() {
     <h2>Recent sessions</h2>
     <p class="sub">The last ${d.sessions.length} sessions, newest first.</p>
     <div class="tw"><table>
-      <thead><tr><th>Received</th><th>Session</th><th class="num">List</th><th class="num">Time</th><th>Source</th><th>English</th><th>T2I use</th><th>Attention</th></tr></thead>
+      <thead><tr><th>Received</th><th>Session</th><th class="num">List</th><th class="num">Time</th><th>Source</th><th>English</th><th>T2I use</th><th>Quality</th></tr></thead>
       <tbody>${d.sessions.map(s => `<tr>
         <td class="num">${when(s.received_at)}</td><td class="mono">${esc(s.session)}</td><td class="num">${s.list_id}</td>
         <td class="num">${s.minutes == null ? "–" : fmt(s.minutes, 1) + " min"}</td>
         <td>${s.prolific ? "Prolific" : "Direct"}</td><td>${esc(s.english)}</td><td>${esc(s.t2i)}</td>
-        <td>${s.failed_check ? `<span class="fail">✕ Failed</span>` : "✓ Passed"}</td></tr>`).join("") || `<tr><td colspan="8" class="muted">No sessions yet.</td></tr>`}</tbody>
+        <td>${s.flags.length ? `<span class="fail">✕ ${s.flags.map(f => FLAG[f] || f).join(", ")}</span>` : "✓ Passed"}</td></tr>`).join("") || `<tr><td colspan="8" class="muted">No sessions yet.</td></tr>`}</tbody>
     </table></div>
   </section>`;
   $("#refresh").onclick = () => load(true);

@@ -44,7 +44,7 @@ pip install huggingface_hub pandas pyarrow
 python analysis/collect_responses.py Enzo-py/partial-prompting-responses --out responses.parquet
 ```
 
-Downloads every session, flattens to one row per trial, and flags participants who failed the attention check. Downloaded responses are git-ignored; they stay in the private repo.
+Downloads every session, flattens to one row per trial, and flags the sessions that fail a quality filter (attention check, an image under 1 s, identical ratings). Downloaded responses are git-ignored; they stay in the private repo.
 
 ## Taxonomy
 

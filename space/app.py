@@ -21,6 +21,7 @@ Environment variables (set them as Space secrets / variables):
   STUDY_VERSION             optional label stored with every session (default "pilot-v1")
   ADMIN_KEY                 optional; protects /api/status
 """
+import hashlib
 import json
 import os
 import random
@@ -45,6 +46,8 @@ HF_TOKEN = os.environ.get("HF_TOKEN")
 COMPLETION_CODE = os.environ.get("PROLIFIC_COMPLETION_CODE")
 STUDY_VERSION = os.environ.get("STUDY_VERSION", "pilot-v1")
 ADMIN_KEY = os.environ.get("ADMIN_KEY")
+PID_SALT = os.environ.get("PID_SALT")            # optional secret; stores a hash of the Prolific ID
+STUDY_CONTACT = os.environ.get("STUDY_CONTACT")  # optional; who to contact, shown on the consent page
 PENDING_TTL = 30 * 60  # a started session counts towards its list for 30 min
 
 # ---------------------------------------------------------------- stimuli & lists
@@ -321,6 +324,15 @@ async def submit(req: Request):
         if s:
             for k in LABEL_FIELDS:
                 t[k] = s.get(k)
+    # Prolific IDs are never saved: only whether the participant came from Prolific, plus an optional
+    # salted hash (PID_SALT) that lets the researchers match a Prolific submission to its session.
+    participant = body.get("participant") or {}
+    pid = participant.pop("prolific_pid", None)
+    participant.pop("prolific_session_id", None)
+    participant["source"] = "prolific" if pid else "direct"
+    if pid and PID_SALT:
+        participant["pid_hash"] = hashlib.sha256(f"{PID_SALT}:{pid}".encode()).hexdigest()[:16]
+    body["participant"] = participant
     body["received_at"] = datetime.now(timezone.utc).isoformat()
     body["study_version"] = STUDY_VERSION
     body["dataset"] = {"repo": DATASET_REPO, "revision": DATASET_SHA, "split": DATASET_SPLIT}
@@ -337,10 +349,9 @@ async def submit(req: Request):
         if new:
             completed[list_id] += 1
 
-    redirect = (f"https://app.prolific.com/submissions/complete?cc={COMPLETION_CODE}"
-                if COMPLETION_CODE and body.get("participant", {}).get("prolific_pid") else None)
-    return {"ok": True, "completion_code": COMPLETION_CODE if body.get("participant", {}).get("prolific_pid") else None,
-            "redirect": redirect}
+    code = COMPLETION_CODE if pid else None
+    redirect = f"https://app.prolific.com/submissions/complete?cc={code}" if code else None
+    return {"ok": True, "completion_code": code, "redirect": redirect}
 
 
 @app.get("/api/status")
@@ -387,10 +398,23 @@ def load_sessions(max_age=60):
         return sessions
 
 
-def failed_attention_check(session):
-    """Same rule as analysis/collect_responses.py: a rating above 2 on a control stimulus."""
-    return any((t.get("rating") or 0) > 2 for t in session.get("trials", [])
-               if BY_ID.get(t.get("sample_id"), {}).get("role") == "control")
+# Quality filters. analysis/collect_responses.py applies the same three rules.
+FAST_TRIAL_MS = 1000       # an image answered faster than this
+SAME_ANSWER_SHARE = 0.99   # share of identical ratings across a session
+
+
+def quality_flags(session):
+    """The filters a session fails; any of them excludes it from the statistics."""
+    trials = [t for t in session.get("trials", []) if t.get("rating")]
+    flags = []
+    if any(t["rating"] > 2 for t in trials if BY_ID.get(t.get("sample_id"), {}).get("role") == "control"):
+        flags.append("attention_check")  # the control expects a rating of 1
+    if any((t.get("rt") or 0) < FAST_TRIAL_MS for t in trials):
+        flags.append("too_fast")
+    ratings = Counter(t["rating"] for t in trials)
+    if trials and ratings.most_common(1)[0][1] / len(trials) >= SAME_ANSWER_SHARE:
+        flags.append("same_answers")
+    return flags
 
 
 def median(values):
@@ -403,12 +427,13 @@ def mean(values):
 
 
 def summarize(sessions):
-    """Progress per list and response statistics. Sessions that fail the attention check are
+    """Progress per list and response statistics. Sessions that fail a quality filter are
     counted in the progress but left out of the response statistics."""
     now = time.time()
     active = Counter(l for l, t in pending.values() if now - t < PENDING_TTL)
     done = Counter(s.get("list_id") for s in sessions)
-    included = [s for s in sessions if not failed_attention_check(s)]
+    flags = {id(s): quality_flags(s) for s in sessions}
+    included = [s for s in sessions if not flags[id(s)]]
 
     trials = defaultdict(list)
     for s in included:
@@ -456,6 +481,7 @@ def summarize(sessions):
         "saving_to": RESPONSES_REPO if scheduler else "local folder only (RESPONSES_REPO or HF_TOKEN missing)",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "totals": {"completed": len(sessions), "excluded": len(sessions) - len(included),
+                   "excluded_by": dict(Counter(f for s in sessions for f in flags[id(s)])),
                    "in_progress": sum(active.values()),
                    "median_minutes": (median([s["total_time_ms"] for s in sessions
                                               if s.get("total_time_ms")]) or 0) / 60000 or None},
@@ -466,10 +492,11 @@ def summarize(sessions):
         "sessions": [{"session": str(s.get("session_id", ""))[:8], "list_id": s.get("list_id"),
                       "received_at": s.get("received_at"),
                       "minutes": (s.get("total_time_ms") or 0) / 60000 or None,
-                      "prolific": bool(s.get("participant", {}).get("prolific_pid")),
+                      "prolific": s.get("participant", {}).get("source") == "prolific"
+                                  or bool(s.get("participant", {}).get("prolific_pid")),  # sessions saved before IDs were dropped
                       "english": s.get("participant", {}).get("english"),
                       "t2i": s.get("participant", {}).get("t2i"),
-                      "failed_check": failed_attention_check(s)}
+                      "flags": flags[id(s)]}
                      for s in recent],
     }
 
@@ -492,12 +519,12 @@ FEEDBACK_MIN_ITEMS = 3    # below this many comparable stimuli, no feedback is s
 def feedback_for(session):
     """Compare a participant's ratings with the other participants', after their answers are saved.
 
-    Controls are never used (they would reveal the attention check), nor are sessions that failed
-    it. Returns None until enough other participants have rated this participant's stimuli.
+    Controls are never used (they would reveal the attention check), nor are sessions that fail a
+    quality filter. Returns None until enough other participants have rated this participant's stimuli.
     """
     others = defaultdict(list)
     for s in load_sessions().values():
-        if s.get("session_id") == session.get("session_id") or failed_attention_check(s):
+        if s.get("session_id") == session.get("session_id") or quality_flags(s):
             continue
         for t in s.get("trials", []):
             if t.get("rating"):
