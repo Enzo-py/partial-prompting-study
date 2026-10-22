@@ -19,7 +19,10 @@ Environment variables (set them as Space secrets / variables):
   HF_TOKEN                  write token for RESPONSES_REPO (secret)
   PROLIFIC_COMPLETION_CODE  optional; participants are redirected to Prolific with this code
   STUDY_VERSION             optional label stored with every session (default "pilot-v1")
-  ADMIN_KEY                 optional; protects /api/status
+  ADMIN_KEY                 optional; protects /api/status and enables /admin
+  STUDY_CONTACT             optional; researcher contact shown on the consent page
+  PID_SALT                  optional secret; saves a salted hash of the Prolific ID (never the ID itself)
+  LIST_COUNT, LIST_SIZE     optional; number of lists (default 5) and images per list (default 20, at most)
 """
 import hashlib
 import json
