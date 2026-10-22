@@ -152,8 +152,9 @@ BY_ID = {s["sample_id"]: s for s in STIMULI}
 # Labels for the saved files: every dataset column except the ones already sent or stored elsewhere.
 LABEL_FIELDS = [k for k in STIMULI[0] if k not in ("sample_id", "prompt", "file_name")]
 
-# Public fields sent to the browser. Taxonomy labels stay server-side so participants never see them.
-PUBLIC_FIELDS = ("sample_id", "prompt", "file_name")
+# Public fields sent to the browser. Taxonomy labels stay server-side so participants never see them;
+# visual_style is shown above the image so the drawing style is not mistaken for a mismatch.
+PUBLIC_FIELDS = ("sample_id", "prompt", "file_name", "visual_style")
 
 
 LIST_COUNT = int(os.environ.get("LIST_COUNT", 5))   # number of counterbalanced lists
@@ -303,9 +304,9 @@ async def start(req: Request):
         list_id = choose_list()
         session_id = uuid.uuid4().hex
         pending[session_id] = (list_id, time.time())
-    stimuli = [{k: BY_ID[i][k] for k in PUBLIC_FIELDS} for i in LISTS[list_id]]
+    stimuli = [{k: BY_ID[i].get(k) for k in PUBLIC_FIELDS} for i in LISTS[list_id]]
     return {"session_id": session_id, "list_id": list_id, "study_version": STUDY_VERSION,
-            "stimuli": stimuli, "prolific": bool(body.get("prolific_pid"))}
+            "stimuli": stimuli, "prolific": bool(body.get("prolific_pid")), "contact": STUDY_CONTACT}
 
 
 @app.post("/api/submit")
@@ -543,7 +544,7 @@ def feedback_for(session):
         "mean_diff": round(mean([r - m for _, r, m, _ in rows]), 2),
         "n_close": sum(abs(r - m) <= 1 for _, r, m, _ in rows),
         # Only a real disagreement is worth showing.
-        "most_different": {**{k: st[k] for k in PUBLIC_FIELDS}, "rating": rating,
+        "most_different": {**{k: st.get(k) for k in PUBLIC_FIELDS}, "rating": rating,
                            "others_mean": round(m, 1), "others_n": n} if abs(rating - m) >= 1 else None,
     }
 

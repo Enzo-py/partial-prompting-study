@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520" width="800" height="520">
+  <!-- Practice image (not part of the dataset): "a house", with a tree and the sun it does not mention. -->
+  <rect width="800" height="520" fill="#cfe6f5"/>
+  <circle cx="660" cy="100" r="44" fill="#f7d24a"/>
+  <rect y="380" width="800" height="140" fill="#8cbf6a"/>
+  <rect x="290" y="250" width="240" height="170" fill="#e9dcc6"/>
+  <polygon points="270,256 410,150 550,256" fill="#a5523a"/>
+  <rect x="385" y="330" width="50" height="90" fill="#7a5233"/>
+  <rect x="315" y="285" width="50" height="45" fill="#9fc7e3" stroke="#ffffff" stroke-width="4"/>
+  <rect x="455" y="285" width="50" height="45" fill="#9fc7e3" stroke="#ffffff" stroke-width="4"/>
+  <rect x="138" y="300" width="22" height="100" fill="#6e4a2e"/>
+  <circle cx="149" cy="270" r="58" fill="#4f8f3a"/>
+</svg>
