@@ -443,13 +443,26 @@ FAST_TRIAL_MS = 1000       # an image answered faster than this...
 FAST_SHARE = 0.25          # ...for this share of the images or more
 SAME_ANSWER_SHARE = 0.99   # share of identical ratings across a session
 EXCLUDE_AT = 3             # failed checks that exclude a session
+# A check fails when the rating says the image matches. Only an absent object makes "Partly" (3)
+# wrong; a wrong colour, count or relation can honestly be rated 3, so those fail from "Mostly" (4).
+CHECK_FAIL_AT = {"absent": 3}
+CHECK_FAIL_AT_DEFAULT = 4
+
+
+def failed_check(t):
+    """Whether a trial is an attention check rated as matching. Uses the labels saved with the trial,
+    so a session is judged on the stimuli it was shown even if the dataset changed since."""
+    s = t if "control_type" in t else BY_ID.get(t.get("sample_id"), {})  # older sessions: current labels
+    if not is_attention_check(s):
+        return False
+    kind = s.get("control_type") or "absent"  # the original check (E1, "a banana") is an absent object
+    return t["rating"] >= CHECK_FAIL_AT.get(kind, CHECK_FAIL_AT_DEFAULT)
 
 
 def quality_flags(session):
     """The checks a session fails, one entry per failed attention-check stimulus."""
     trials = [t for t in session.get("trials", []) if t.get("rating")]
-    flags = ["attention_check" for t in trials  # each attention check expects a rating of 1
-             if is_attention_check(BY_ID.get(t.get("sample_id"), {})) and t["rating"] > 2]
+    flags = ["attention_check" for t in trials if failed_check(t)]
     if trials and sum((t.get("rt") or 0) < FAST_TRIAL_MS for t in trials) / len(trials) >= FAST_SHARE:
         flags.append("too_fast")
     ratings = Counter(t["rating"] for t in trials)

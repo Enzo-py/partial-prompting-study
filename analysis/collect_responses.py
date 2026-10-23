@@ -5,7 +5,8 @@ Usage:
     python analysis/collect_responses.py Enzo-py/partial-prompting-responses [--out responses.parquet]
 
 Adds one column per quality check, the same rules as the Space (space/app.py, `quality_flags`):
-  failed_attention_check  number of attention checks rated above 2
+  failed_attention_check  number of attention checks rated as matching (3+ for an absent
+                          object, 4+ for a wrong attribute, count, relation or binding)
   too_fast                25% or more of the images answered in under 1 s
   same_answers            99% or more of the ratings are identical
 then `n_failed_checks` (each failed attention check counts once) and `excluded` from 3 failed checks. `position` is the presentation order and `rt` the time
@@ -45,7 +46,9 @@ by_session = df.groupby("session_id")
 # datasets). Other "control" stimuli are a pair's control condition, analysed like the rest.
 col = lambda c: df[c] if c in df else pd.Series(None, index=df.index)
 is_check = (df["role"] == "control") & (col("control_type").notna() | (col("subcategory") == "Attention check") | (col("case_id") == "E1"))
-ctrl = df[is_check].groupby("session_id")["rating"].agg(lambda r: int((r > 2).sum()))
+# Failed = rated as matching: from 3 for an absent object, from 4 for a wrong colour, count or relation.
+fail_at = col("control_type").fillna("absent").map(lambda k: 3 if k == "absent" else 4)
+ctrl = (df["rating"] >= fail_at)[is_check].groupby(df["session_id"]).sum()
 df["failed_attention_check"] = df["session_id"].map(ctrl).fillna(0).astype(int)
 df["too_fast"] = df["session_id"].map(by_session["rt"].agg(lambda r: (r < 1000).mean() >= 0.25))
 df["same_answers"] = df["session_id"].map(by_session["rating"].agg(lambda r: r.value_counts(normalize=True).iloc[0] >= 0.99))
