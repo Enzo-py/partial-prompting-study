@@ -4,11 +4,11 @@ Usage:
     pip install huggingface_hub pandas pyarrow
     python analysis/collect_responses.py Enzo-py/partial-prompting-responses [--out responses.parquet]
 
-Adds one column per quality filter, the same rules as the Space (space/app.py, `quality_flags`):
-  failed_attention_check  rating above 2 on the control stimulus
-  too_fast                at least one image answered in under 1 s
+Adds one column per quality check, the same rules as the Space (space/app.py, `quality_flags`):
+  failed_attention_check  number of attention checks rated above 2
+  too_fast                25% or more of the images answered in under 1 s
   same_answers            99% or more of the ratings are identical
-and `excluded` when any of them is true. `position` is the presentation order and `rt` the time
+then `n_failed_checks` (each failed attention check counts once) and `excluded` from 3 failed checks. `position` is the presentation order and `rt` the time
 spent on the image (ms, from display to "Next").
 """
 import argparse
@@ -41,11 +41,16 @@ df = pd.DataFrame(rows)
 if df.empty:
     raise SystemExit("No responses yet.")
 by_session = df.groupby("session_id")
-ctrl = df[df["role"] == "control"].groupby("session_id")["rating"].max()
-df["failed_attention_check"] = df["session_id"].map(ctrl > 2).fillna(False)
-df["too_fast"] = df["session_id"].map(by_session["rt"].min() < 1000)
+# Attention checks: controls the image plainly contradicts (control_type set; case E1 in older
+# datasets). Other "control" stimuli are a pair's control condition, analysed like the rest.
+col = lambda c: df[c] if c in df else pd.Series(None, index=df.index)
+is_check = (df["role"] == "control") & (col("control_type").notna() | (col("subcategory") == "Attention check") | (col("case_id") == "E1"))
+ctrl = df[is_check].groupby("session_id")["rating"].agg(lambda r: int((r > 2).sum()))
+df["failed_attention_check"] = df["session_id"].map(ctrl).fillna(0).astype(int)
+df["too_fast"] = df["session_id"].map(by_session["rt"].agg(lambda r: (r < 1000).mean() >= 0.25))
 df["same_answers"] = df["session_id"].map(by_session["rating"].agg(lambda r: r.value_counts(normalize=True).iloc[0] >= 0.99))
-df["excluded"] = df["failed_attention_check"] | df["too_fast"] | df["same_answers"]
+df["n_failed_checks"] = df["failed_attention_check"] + df["too_fast"].astype(int) + df["same_answers"].astype(int)
+df["excluded"] = df["n_failed_checks"] >= 3
 df.to_parquet(args.out, index=False)
 print(f"{df.session_id.nunique()} sessions ({df[df.excluded].session_id.nunique()} excluded), {len(df)} trials -> {args.out}")
 print(df.groupby(["case_id", "role"])["rating"].agg(["count", "mean", "std"]).round(2))

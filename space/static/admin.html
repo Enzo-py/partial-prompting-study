@@ -86,6 +86,7 @@ tr.stim[aria-expanded=true] td{background:var(--accent-soft)}
 .pm .t i{display:block;height:100%;background:var(--accent);border-radius:0 3px 3px 0}
 .pm .v{text-align:right;font-size:12.5px;font-variant-numeric:tabular-nums}
 .fail{color:var(--bad);font-weight:500}
+.warn{color:var(--warn)}
 #login{max-width:400px;margin:14vh auto;padding:0 16px;display:flex;flex-direction:column;gap:12px}
 #login form{display:flex;gap:8px}
 @media (max-width:640px){
@@ -107,7 +108,10 @@ const $ = (s, el = document) => el.querySelector(s);
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt = (v, d = 2) => v == null ? "–" : (+v).toFixed(d);
 const pct = v => v == null ? "–" : Math.round(v * 100) + "%";
-const FLAG = {attention_check: "Attention check", too_fast: "Under 1 s on an image", same_answers: "Same rating everywhere"};
+const FLAG = {attention_check: "Attention check", too_fast: "Many answers under 1 s", same_answers: "Same rating everywhere"};
+// "Attention check, Attention check" -> "2 × Attention check"
+const flagText = flags => Object.entries(flags.reduce((c, f) => (c[f] = (c[f] || 0) + 1, c), {}))
+  .map(([f, n]) => `${n > 1 ? n + " × " : ""}${FLAG[f] || f}`).join(", ");
 const when = iso => iso ? new Date(iso).toLocaleString(undefined, {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"}) : "–";
 
 const params = new URLSearchParams(location.search);
@@ -152,7 +156,7 @@ function render() {
   <div class="tiles">
     <div class="tile"><span class="eyebrow">Completed</span><b>${t.completed}</b><span class="note">sessions saved</span></div>
     <div class="tile"><span class="eyebrow">In progress</span><b>${t.in_progress}</b><span class="note">started in the last 30 min</span></div>
-    <div class="tile"><span class="eyebrow">Excluded</span><b>${t.excluded}</b><span class="note">${t.excluded ? Object.entries(t.excluded_by).map(([f, n]) => `${FLAG[f] || f} ${n}`).join(" · ") : "failed a quality filter"}</span></div>
+    <div class="tile"><span class="eyebrow">Excluded</span><b>${t.excluded}</b><span class="note">${t.excluded ? Object.entries(t.excluded_by).map(([f, n]) => `${FLAG[f] || f} ${n}`).join(" · ") : `failed ${t.exclude_at} checks or more`}${t.flagged ? ` · ${t.flagged} more with warnings` : ""}</span></div>
     <div class="tile"><span class="eyebrow">Median time</span><b>${t.median_minutes == null ? "–" : fmt(t.median_minutes, 1) + " min"}</b><span class="note">per completed session</span></div>
   </div>
 
@@ -170,7 +174,7 @@ function render() {
 
   <section class="card">
     <h2>By category</h2>
-    <p class="sub">Test stimuli only. Rating from 1 (does not match) to 5 (matches). Excluded sessions are left out of every statistic below.</p>
+    <p class="sub">Attention check left out. Rating from 1 (does not match) to 5 (matches). Excluded sessions are left out of every statistic below.</p>
     <div class="tw"><table>
       <thead><tr><th>Category</th><th class="num">Ratings</th><th class="num">Mean rating</th><th class="num">“Should not be there”</th></tr></thead>
       <tbody>${d.categories.map(c => `<tr>
@@ -206,7 +210,8 @@ function render() {
         <td class="num">${when(s.received_at)}</td><td class="mono">${esc(s.session)}</td><td class="num">${s.list_id}</td>
         <td class="num">${s.minutes == null ? "–" : fmt(s.minutes, 1) + " min"}</td>
         <td>${s.prolific ? "Prolific" : "Direct"}</td><td>${esc(s.english)}</td><td>${esc(s.t2i)}</td>
-        <td>${s.flags.length ? `<span class="fail">✕ ${s.flags.map(f => FLAG[f] || f).join(", ")}</span>` : "✓ Passed"}</td></tr>`).join("") || `<tr><td colspan="8" class="muted">No sessions yet.</td></tr>`}</tbody>
+        <td>${s.excluded ? `<span class="fail">✕ Excluded: ${flagText(s.flags)}</span>`
+             : s.flags.length ? `<span class="warn">⚠ ${flagText(s.flags)}</span>` : "✓ Passed"}</td></tr>`).join("") || `<tr><td colspan="8" class="muted">No sessions yet.</td></tr>`}</tbody>
     </table></div>
   </section>`;
   $("#refresh").onclick = () => load(true);
@@ -237,7 +242,7 @@ function renderStimuli() {
     return `<tr class="stim" data-id="${esc(s.sample_id)}" aria-expanded="${open.has(s.sample_id)}" tabindex="0">
       <td class="mono">${esc(s.sample_id)}</td>
       <td><span class="prompt">${esc(s.prompt)}</span></td>
-      <td>${s.role === "control" ? `<span class="tag ctrl">control</span>` : `<span class="tag">${esc(s.case_id)}</span>`}</td>
+      <td>${s.attention_check ? `<span class="tag ctrl">attention check</span>` : `<span class="tag">${esc(s.case_id)}</span>`}</td>
       <td class="num">${s.n}</td>
       <td class="num">${meanbar(s.mean)}</td>
       <td><span class="hist" title="${s.dist.map((c, i) => `${i + 1}: ${c}`).join(" · ")}">${s.dist.map(c => `<i class="${c ? "" : "zero"}" style="height:${c ? Math.max(3, c / peak * 26) : 1}px"></i>`).join("")}</span></td>

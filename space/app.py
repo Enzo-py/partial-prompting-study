@@ -7,7 +7,8 @@
 
 Stimuli are loaded at startup from a Hugging Face dataset (DATASET_REPO), either an imagefolder
 (`metadata.jsonl` + image files) or parquet with embedded images. Required columns: `sample_id`,
-`prompt`, and the image (`file_name` / `image`). Optional: `role` ("control" = shown to everyone), `pair_ids`,
+`prompt`, and the image (`file_name` / `image`). Optional: `human_study` (false = never shown),
+`role` + `control_type` (attention checks), `pair_ids`,
 `image_id`, plus any label columns (copied into the saved responses). Restart the Space to pick up
 a new version of the dataset; the exact dataset commit is stored with every session.
 
@@ -22,10 +23,13 @@ Environment variables (set them as Space secrets / variables):
   ADMIN_KEY                 optional; protects /api/status and enables /admin
   STUDY_CONTACT             optional; researcher contact shown on the consent page
   PID_SALT                  optional secret; saves a salted hash of the Prolific ID (never the ID itself)
-  LIST_COUNT, LIST_SIZE     optional; number of lists (default 5) and images per list (default 20, at most)
+  LIST_COUNT, LIST_SIZE     optional; number of lists (default: just enough to show every stimulus) and
+                            study images per list (default 20, at most)
+  CHECKS_PER_LIST           optional; attention checks per list, rotating (default 4)
 """
 import hashlib
 import json
+import math
 import os
 import random
 import threading
@@ -153,15 +157,29 @@ def load_stimuli():
 STIMULI, DATASET_SHA = load_stimuli()
 BY_ID = {s["sample_id"]: s for s in STIMULI}
 # Labels for the saved files: every dataset column except the ones already sent or stored elsewhere.
-LABEL_FIELDS = [k for k in STIMULI[0] if k not in ("sample_id", "prompt", "file_name")]
+LABEL_FIELDS = list(dict.fromkeys(k for s in STIMULI for k in s if k not in ("sample_id", "prompt", "file_name")))
 
 # Public fields sent to the browser. Taxonomy labels stay server-side so participants never see them;
 # visual_style is shown above the image so the drawing style is not mistaken for a mismatch.
 PUBLIC_FIELDS = ("sample_id", "prompt", "file_name", "visual_style")
 
 
-LIST_COUNT = int(os.environ.get("LIST_COUNT", 5))   # number of counterbalanced lists
-LIST_SIZE = int(os.environ.get("LIST_SIZE", 20))    # images per list, controls included (an upper bound)
+LIST_COUNT = int(os.environ.get("LIST_COUNT") or 0)   # number of lists; 0 = just enough to show every stimulus
+LIST_SIZE = int(os.environ.get("LIST_SIZE", 20))      # study images per list (an upper bound), checks not included
+CHECKS_PER_LIST = int(os.environ.get("CHECKS_PER_LIST", 4))  # attention checks per list, rotating
+
+
+def in_study(s):
+    """Stimuli marked human_study = false only serve the pair table and are never shown."""
+    return s.get("human_study", True) is not False
+
+
+def is_attention_check(s):
+    """A control whose text the image plainly contradicts (`control_type`: absent, relation, ...): its
+    answer is a rating of 1. Other controls (e.g. "every detail true") are the control condition of a
+    pair and are counterbalanced like any other stimulus. Older datasets mark the check as case E1."""
+    return s.get("role") == "control" and bool(
+        s.get("control_type") or s.get("subcategory") == "Attention check" or s.get("case_id") == "E1")
 
 
 def conflict(a, b):
@@ -169,14 +187,17 @@ def conflict(a, b):
     return bool(set(a["pair_ids"]) & set(b["pair_ids"])) or a["image_id"] == b["image_id"] or a["prompt"] == b["prompt"]
 
 
-def design_lists(ids, neighbours, n_lists, size, seed=0, restarts=20, steps=20000):
-    """n_lists conflict-free lists of `size` items, each item shown about equally often.
+def design_lists(ids, neighbours, n_lists, size, fixed=None, seed=0, restarts=10, steps=20000):
+    """n_lists conflict-free lists of `size` items from `ids`, each item shown about equally often.
 
-    Local search, deterministic for a given dataset: swap an item out of a list and another in,
-    keeping the list conflict-free, whenever exposures get more even. The two members of a pair are
-    also pushed towards equal exposure, so each comparison has balanced cells.
+    `fixed[l]` are items already in list l (e.g. its attention checks): nothing conflicting with them
+    goes in that list. Local search, deterministic for a given dataset: swap an item out of a list
+    and another in, keeping the list conflict-free, whenever exposures get more even. Conflicting
+    items (the members of a pair) are also pushed towards equal exposure, so cells stay balanced.
     """
-    pairs = [(a, b) for a in ids for b in neighbours[a] if a < b]
+    fixed = fixed or [set() for _ in range(n_lists)]
+    pool = set(ids)
+    pairs = [(a, b) for a in ids for b in neighbours[a] if b in pool and a < b]
     target = n_lists * size / len(ids)
 
     def cost(count):
@@ -187,10 +208,10 @@ def design_lists(ids, neighbours, n_lists, size, seed=0, restarts=20, steps=2000
     for r in range(restarts):
         rng = random.Random(seed * 1000 + r)
         count, lists = Counter(), []
-        for _ in range(n_lists):  # greedy start: least shown items first
+        for l in range(n_lists):  # greedy start: least shown items first
             cur = set()
             for i in sorted(ids, key=lambda i: (count[i], rng.random())):
-                if len(cur) < size and not neighbours[i] & cur:
+                if len(cur) < size and not neighbours[i] & (cur | fixed[l]):
                     cur.add(i)
             lists.append(cur)
             count.update(cur)
@@ -198,9 +219,11 @@ def design_lists(ids, neighbours, n_lists, size, seed=0, restarts=20, steps=2000
             continue
         c = cost(count)
         for _ in range(steps):
-            cur = lists[rng.randrange(n_lists)]
+            l = rng.randrange(n_lists)
+            cur = lists[l]
             out = rng.choice(sorted(cur))
-            cand = [i for i in ids if i not in cur and not neighbours[i] & (cur - {out})]
+            blocked = (cur - {out}) | fixed[l]
+            cand = [i for i in ids if i not in cur and not neighbours[i] & blocked]
             if not cand:
                 continue
             new = rng.choice(cand)
@@ -220,37 +243,49 @@ def design_lists(ids, neighbours, n_lists, size, seed=0, restarts=20, steps=2000
 
 
 def build_lists(stimuli):
-    """Counterbalanced lists. Controls are shown to everyone; every other stimulus goes in some lists,
-    never together with a conflicting one (see `conflict`), so each comparison is between-subjects.
-    Stimuli that conflict with a control can never be shown and are left out.
+    """Counterbalanced lists: CHECKS_PER_LIST attention checks plus up to LIST_SIZE study images each,
+    never two conflicting stimuli together (see `conflict`), so each comparison is between-subjects.
+    Returns (lists, attention checks, stimuli not in the study).
     """
-    controls = [s["sample_id"] for s in stimuli if s["role"] == "control"]
-    ctrl = [s for s in stimuli if s["role"] == "control"]
-    excluded = [s["sample_id"] for s in stimuli
-                if s["role"] != "control" and any(conflict(s, c) for c in ctrl)]
-    pool = [s for s in stimuli if s["role"] != "control" and s["sample_id"] not in excluded]
-    ids = sorted(s["sample_id"] for s in pool)
-    neighbours = {i: set() for i in ids}
-    for a in pool:
-        for b in pool:
+    study = [s for s in stimuli if in_study(s)]
+    checks = sorted(s["sample_id"] for s in study if is_attention_check(s))
+    items = sorted(s["sample_id"] for s in study if not is_attention_check(s))
+    neighbours = {s["sample_id"]: set() for s in study}
+    for a in study:
+        for b in study:
             if a is not b and conflict(a, b):
                 neighbours[a["sample_id"]].add(b["sample_id"])
+    # Stimuli sharing a text, an image or a pair all conflict with each other, so each needs its own
+    # list: the largest such group is a lower bound on the number of lists.
+    groups = Counter()
+    for s in study:
+        if not is_attention_check(s):
+            groups.update([("text", s["prompt"]), ("image", s["image_id"])] + [("pair", p) for p in s["pair_ids"]])
+    min_lists = max(groups.values(), default=1)
     # Largest list size that still fits: there may be fewer conflict-free items than LIST_SIZE asks.
-    for size in range(min(LIST_SIZE - len(controls), len(ids)), 0, -1):
-        lists = design_lists(ids, neighbours, LIST_COUNT, size)
+    for size in range(min(LIST_SIZE, len(items)), 0, -1):
+        n_lists = LIST_COUNT or max(math.ceil(len(items) / size), min_lists)
+        if not LIST_COUNT:  # spread the items evenly over those lists
+            size = math.ceil(len(items) / n_lists)
+        k = min(CHECKS_PER_LIST, len(checks))
+        check_lists = (design_lists(checks, neighbours, n_lists, k) if k else None) or [[] for _ in range(n_lists)]
+        lists = design_lists(items, neighbours, n_lists, size, fixed=[set(c) for c in check_lists])
         if lists:
             break
     else:
-        lists = [[] for _ in range(LIST_COUNT)]
-    return [sorted(controls + l) for l in lists], controls, excluded
+        check_lists, lists = [[]], [[]]
+    not_shown = [s["sample_id"] for s in stimuli if not in_study(s)]
+    return [sorted(c + l) for c, l in zip(check_lists, lists)], checks, not_shown
 
 
-LISTS, CONTROLS, EXCLUDED = build_lists(STIMULI)
+LISTS, CHECKS, NOT_IN_STUDY = build_lists(STIMULI)
+STUDY = [s for s in STIMULI if in_study(s)]
 EXPOSURE = Counter(i for l in LISTS for i in l)
 (ROOT / "lists.json").write_text(json.dumps(
-    {"n_lists": len(LISTS), "always_shown": CONTROLS, "never_shown": EXCLUDED,
+    {"n_lists": len(LISTS), "attention_checks": CHECKS, "not_in_study": NOT_IN_STUDY,
      "exposure": dict(sorted(EXPOSURE.items())), "lists": LISTS}, indent=2))
-print(f"{len(LISTS)} lists of {len(LISTS[0])} images; never shown (conflict with a control): {EXCLUDED or 'none'}")
+print(f"{len(LISTS)} lists of {sorted({len(l) for l in LISTS})} images, {min(CHECKS_PER_LIST, len(CHECKS))} attention "
+      f"checks each; {len(NOT_IN_STUDY)} stimuli not in the study (human_study = false)")
 
 
 # ---------------------------------------------------------------- persistence
@@ -402,23 +437,29 @@ def load_sessions(max_age=60):
         return sessions
 
 
-# Quality filters. analysis/collect_responses.py applies the same three rules.
-FAST_TRIAL_MS = 1000       # an image answered faster than this
+# Quality checks. analysis/collect_responses.py applies the same rules. Each failed attention check
+# counts once; a session is excluded once it fails EXCLUDE_AT checks, fewer are only a warning.
+FAST_TRIAL_MS = 1000       # an image answered faster than this...
+FAST_SHARE = 0.25          # ...for this share of the images or more
 SAME_ANSWER_SHARE = 0.99   # share of identical ratings across a session
+EXCLUDE_AT = 3             # failed checks that exclude a session
 
 
 def quality_flags(session):
-    """The filters a session fails; any of them excludes it from the statistics."""
+    """The checks a session fails, one entry per failed attention-check stimulus."""
     trials = [t for t in session.get("trials", []) if t.get("rating")]
-    flags = []
-    if any(t["rating"] > 2 for t in trials if BY_ID.get(t.get("sample_id"), {}).get("role") == "control"):
-        flags.append("attention_check")  # the control expects a rating of 1
-    if any((t.get("rt") or 0) < FAST_TRIAL_MS for t in trials):
+    flags = ["attention_check" for t in trials  # each attention check expects a rating of 1
+             if is_attention_check(BY_ID.get(t.get("sample_id"), {})) and t["rating"] > 2]
+    if trials and sum((t.get("rt") or 0) < FAST_TRIAL_MS for t in trials) / len(trials) >= FAST_SHARE:
         flags.append("too_fast")
     ratings = Counter(t["rating"] for t in trials)
     if trials and ratings.most_common(1)[0][1] / len(trials) >= SAME_ANSWER_SHARE:
         flags.append("same_answers")
     return flags
+
+
+def is_excluded(session):
+    return len(quality_flags(session)) >= EXCLUDE_AT
 
 
 def median(values):
@@ -431,13 +472,13 @@ def mean(values):
 
 
 def summarize(sessions):
-    """Progress per list and response statistics. Sessions that fail a quality filter are
+    """Progress per list and response statistics. Excluded sessions (EXCLUDE_AT failed checks) are
     counted in the progress but left out of the response statistics."""
     now = time.time()
     active = Counter(l for l, t in pending.values() if now - t < PENDING_TTL)
     done = Counter(s.get("list_id") for s in sessions)
     flags = {id(s): quality_flags(s) for s in sessions}
-    included = [s for s in sessions if not flags[id(s)]]
+    included = [s for s in sessions if len(flags[id(s)]) < EXCLUDE_AT]
 
     trials = defaultdict(list)
     for s in included:
@@ -446,12 +487,13 @@ def summarize(sessions):
                 trials[t["sample_id"]].append(t)
 
     stimuli = []
-    for st in STIMULI:
+    for st in STUDY:
         ts = trials[st["sample_id"]]
         ratings = [t["rating"] for t in ts]
         stimuli.append({
             **{k: st.get(k) for k in ("sample_id", "prompt", "file_name", "case_id", "category",
                                       "category_name", "subcategory", "role")},
+            "attention_check": is_attention_check(st),
             "n": len(ts), "mean": mean(ratings),
             "dist": [ratings.count(r) for r in range(1, 6)],
             "unwanted_rate": mean([t.get("unwanted") == "yes" for t in ts]),
@@ -461,15 +503,15 @@ def summarize(sessions):
         })
 
     by_cat = defaultdict(list)
-    for st in STIMULI:
-        if st["role"] != "control":
+    for st in STUDY:
+        if not is_attention_check(st):
             by_cat[(st.get("category"), st.get("category_name"))] += trials[st["sample_id"]]
     categories = [{"category": c, "name": name, "n": len(ts), "mean": mean([t["rating"] for t in ts]),
                    "unwanted_rate": mean([t.get("unwanted") == "yes" for t in ts])}
                   for (c, name), ts in sorted(by_cat.items(), key=lambda kv: str(kv[0][0]))]
 
     by_pair = defaultdict(list)
-    for st in STIMULI:
+    for st in STUDY:
         roles = list(st.get("pair_roles") or [])
         for i, pid in enumerate(st["pair_ids"]):
             ratings = [t["rating"] for t in trials[st["sample_id"]]]
@@ -485,7 +527,9 @@ def summarize(sessions):
         "saving_to": RESPONSES_REPO if scheduler else "local folder only (RESPONSES_REPO or HF_TOKEN missing)",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "totals": {"completed": len(sessions), "excluded": len(sessions) - len(included),
-                   "excluded_by": dict(Counter(f for s in sessions for f in flags[id(s)])),
+                   "exclude_at": EXCLUDE_AT,
+                   "flagged": sum(0 < len(flags[id(s)]) < EXCLUDE_AT for s in sessions),
+                   "excluded_by": dict(Counter(f for s in sessions if len(flags[id(s)]) >= EXCLUDE_AT for f in flags[id(s)])),
                    "in_progress": sum(active.values()),
                    "median_minutes": (median([s["total_time_ms"] for s in sessions
                                               if s.get("total_time_ms")]) or 0) / 60000 or None},
@@ -500,7 +544,7 @@ def summarize(sessions):
                                   or bool(s.get("participant", {}).get("prolific_pid")),  # sessions saved before IDs were dropped
                       "english": s.get("participant", {}).get("english"),
                       "t2i": s.get("participant", {}).get("t2i"),
-                      "flags": flags[id(s)]}
+                      "flags": flags[id(s)], "excluded": len(flags[id(s)]) >= EXCLUDE_AT}
                      for s in recent],
     }
 
@@ -523,12 +567,11 @@ FEEDBACK_MIN_ITEMS = 3    # below this many comparable stimuli, no feedback is s
 def feedback_for(session):
     """Compare a participant's ratings with the other participants', after their answers are saved.
 
-    Controls are never used (they would reveal the attention check), nor are sessions that fail a
-    quality filter. Returns None until enough other participants have rated this participant's stimuli.
+    Attention checks are never used (that would reveal them), nor are excluded sessions. Returns None until enough other participants have rated this participant's stimuli.
     """
     others = defaultdict(list)
     for s in load_sessions().values():
-        if s.get("session_id") == session.get("session_id") or quality_flags(s):
+        if s.get("session_id") == session.get("session_id") or is_excluded(s):
             continue
         for t in s.get("trials", []):
             if t.get("rating"):
@@ -536,7 +579,7 @@ def feedback_for(session):
     rows = []
     for t in session.get("trials", []):
         st = BY_ID.get(t.get("sample_id"))
-        if st and st["role"] != "control" and t.get("rating") and len(others[st["sample_id"]]) >= FEEDBACK_MIN_OTHERS:
+        if st and not is_attention_check(st) and t.get("rating") and len(others[st["sample_id"]]) >= FEEDBACK_MIN_OTHERS:
             ratings = others[st["sample_id"]]
             rows.append((st, t["rating"], mean(ratings), len(ratings)))
     if len(rows) < FEEDBACK_MIN_ITEMS:

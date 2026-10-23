@@ -26,11 +26,11 @@ participant ──► Space (public URL, no login)
                                              → <RESPONSES_REPO>/responses/listNN/<session>.json
 ```
 
-**Counterbalancing.** Two stimuli never go in the same list when they belong to the same minimal pair (`pair_ids`), reuse the same image (`image_id`) or share the same text, so every comparison is between-subjects and nobody sees a text twice. Controls are shown to everyone; a stimulus that conflicts with a control can never be shown and is left out. On startup the backend builds `LIST_COUNT` lists (default 5) of at most `LIST_SIZE` images (default 20, control included), as large as the conflicts allow, with each stimulus shown about equally often and the two members of a pair as evenly as possible. The search is deterministic: the same dataset always gives the same lists. They are written to `lists.json` (with how many lists each stimulus is in) and `/api/status` shows the sizes. Recruit participants in multiples of the number of lists.
+**Counterbalancing.** Only stimuli with `human_study` true are used. The attention checks are the controls whose image plainly contradicts the text (`role` = `control` with a `control_type`); other controls (such as the "every detail true" condition of F pairs) are study stimuli like the rest. Each list gets `CHECKS_PER_LIST` attention checks (default 4, rotating and balanced across lists) and up to `LIST_SIZE` study images (default 20). Two stimuli never go in the same list when they belong to the same minimal pair (`pair_ids`), reuse the same image (`image_id`) or share the same text, so every comparison is between-subjects and nobody sees a text twice. By default there are just enough lists to show every study stimulus at least once, and at least as many as the largest group of stimuli sharing a text, an image or a pair; `LIST_COUNT` forces a number. The search is deterministic: the same dataset always gives the same lists. They are written to `lists.json` (with how many lists each stimulus is in) and `/api/status` shows the sizes. With the current dataset: 9 lists of 22 images (4 checks + 18). Recruit participants in multiples of the number of lists.
 
 **Session.** Consent, a two-question profile, instructions, one practice image (`static/practice.svg`, not saved), then the list in random order. Answering *Yes* to question 2 requires clicking at least one element. Leaving or reloading the page asks for confirmation, since it loses the answers. For each image the session stores its `position` (presentation order) and `rt` (time on the image, from display to *Next*).
 
-**Quality filters.** A session is excluded from the statistics when it fails any of: the attention check (rating above 2 on the control), an image answered in under 1 s, or 99% or more identical ratings (`FAST_TRIAL_MS`, `SAME_ANSWER_SHARE` in `app.py`; `analysis/collect_responses.py` applies the same rules). Excluded sessions still count towards list progress.
+**Quality checks.** Each attention check rated above 2 counts as one failed check, as do 25% or more of the images answered in under 1 s, and 99% or more identical ratings. A session is excluded from the statistics and the feedback once it fails 3 checks; fewer are a warning in the dashboard (`FAST_TRIAL_MS`, `FAST_SHARE`, `SAME_ANSWER_SHARE`, `EXCLUDE_AT` in `app.py`; `analysis/collect_responses.py` applies the same rules). Excluded sessions still count towards list progress.
 
 **Prolific IDs are not saved.** The ID is used only to show the completion code. The session stores `source` (`prolific` or `direct`) and, if the `PID_SALT` secret is set, `pid_hash`: a salted hash that lets you find the session of a given Prolific submission (to reject or bonus it) by hashing its ID with the same salt, without the ID being in the data.
 
@@ -55,7 +55,8 @@ participant ──► Space (public URL, no login)
    | `STUDY_VERSION` | Variable | optional, e.g. `pilot-v1` |
    | `STUDY_CONTACT` | Variable | optional, shown on the consent page, e.g. `Name, institution, email` |
    | `PID_SALT` | Secret | optional, any long random string; saves a hash of the Prolific ID instead of nothing |
-   | `LIST_COUNT` / `LIST_SIZE` | Variable | optional, number of lists (default 5) and images per list (default 20, at most) |
+   | `LIST_COUNT` / `LIST_SIZE` | Variable | optional, number of lists (default: enough to show every stimulus) and study images per list (default 20, at most) |
+   | `CHECKS_PER_LIST` | Variable | optional, attention checks per list (default 4) |
 
 5. **Deploy.** Pushing to `main` on GitHub deploys this folder automatically (see the repository README). To deploy by hand from the repository root:
    ```bash
@@ -81,7 +82,7 @@ The stimuli are read once, when the Space starts. After you push new images or p
 
 - A free Space goes to sleep after a period without visits and takes a few seconds to wake up. Open the Space yourself just before you publish the study.
 - Responses are written locally first and pushed every 2 minutes. A restart can lose at most the last 2 minutes; wait for the commit before restarting or redeploying during data collection.
-- `S12` (attention check) reuses the `apple_red` image of `S18`/`S23`, and `S21` has the same text as `S12`. Under the list rules these three can never be shown, so pairs P-A1, P-C2, P-G1, P-G3, P-A′3 and P-E1 lose a member. Give the control its own image and text and they come back automatically.
+- `S12` (attention check, "a banana") reuses the `apple_red` image of `S18`/`S23` and shares its text with `S21`, so those never appear in the same list as `S12`. That is handled by the lists, but a check with its own image and text would be cleaner.
 - The images are still placeholder illustrations.
 
 ## Saved data (one file per session)
@@ -106,20 +107,20 @@ Click marks are normalized to the image (0–1 on each axis).
 
 After their answers are saved, participants see a short comparison with the other participants: how far their ratings were on average from the others' (in points), on how many images they were within 1 point of the others' average, and the image where they differed most (shown only for a gap of at least 1 point). It is requested separately (`POST /api/feedback`), so it can never delay or change the saved answers.
 
-Safeguards: it is not announced beforehand, so it cannot push anyone to guess the "expected" answer; it is worded as a comparison, never as a score; controls are never used, so the attention check stays hidden; sessions that fail a quality filter are left out of the comparison; a stimulus counts only once at least 5 other participants rated it, and nothing is shown below 3 comparable stimuli (`FEEDBACK_MIN_OTHERS`, `FEEDBACK_MIN_ITEMS` in `app.py`). The first participants therefore see no feedback. The feedback is not saved.
+Safeguards: it is not announced beforehand, so it cannot push anyone to guess the "expected" answer; it is worded as a comparison, never as a score; controls are never used, so the attention check stays hidden; excluded sessions are left out of the comparison; a stimulus counts only once at least 5 other participants rated it, and nothing is shown below 3 comparable stimuli (`FEEDBACK_MIN_OTHERS`, `FEEDBACK_MIN_ITEMS` in `app.py`). The first participants therefore see no feedback. The feedback is not saved.
 
 ## Dashboard
 
 `https://enzo-py-partial-prompting-study.hf.space/admin` shows the study while it runs: sessions completed and in progress, progress per list, exclusions, mean ratings by category, each minimal pair side by side, a table of every stimulus (rating distribution, "should not be there" rate, response time; click a row to see the image with every click mark) and the recent sessions.
 
-The page asks for `ADMIN_KEY` and stays closed until that secret is set. It reads the sessions from `RESPONSES_REPO` plus the ones not pushed yet, refreshed at most once a minute (the Refresh button forces it). Sessions that fail a quality filter count in the progress but not in the statistics, and the page shows which filter each one failed.
+The page asks for `ADMIN_KEY` and stays closed until that secret is set. It reads the sessions from `RESPONSES_REPO` plus the ones not pushed yet, refreshed at most once a minute (the Refresh button forces it). Excluded sessions count in the progress but not in the statistics; the page shows each session's failed checks, as a warning below 3.
 
 ## Analysis
 
 ```bash
 python analysis/collect_responses.py Enzo-py/partial-prompting-responses --out responses.parquet
 ```
-Downloads every session, flattens to one row per trial, and adds one column per quality filter plus `excluded`.
+Downloads every session, flattens to one row per trial, and adds one column per quality check plus `n_failed_checks` and `excluded`.
 
 ## Files
 
