@@ -281,14 +281,12 @@ function renderStimuli() {
 }
 
 function detail(s) {
-  const c = s.confidence;
   return `<tr class="detail"><td colspan="${COLS.length}"><div class="wrap">
     <div class="stimimg"><img src="/stimuli/${encodeURIComponent(s.file_name)}" alt="${esc(s.prompt)}">
       ${s.marks.map(([x, y]) => `<div class="mk" style="left:${x * 100}%;top:${y * 100}%"></div>`).join("")}</div>
     <dl>
       <dt>Category</dt><dd><span class="tag">${esc(s.category)}</span> ${esc(s.category_name)} · ${esc(s.subcategory)}</dd>
       <dt>Ratings</dt><dd>${s.dist.map((n, i) => `${i + 1}: <b>${n}</b>`).join(" · ")}</dd>
-      <dt>Confidence</dt><dd>Not sure <b>${c.low}</b> · Fairly sure <b>${c.mid}</b> · Very sure <b>${c.high}</b></dd>
       <dt>Click marks</dt><dd>${s.marks.length}</dd>
     </dl></div></td></tr>`;
 }

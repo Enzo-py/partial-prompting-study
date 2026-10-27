@@ -563,7 +563,6 @@ def summarize(sessions):
             "n": len(ts), "mean": mean(ratings),
             "dist": [ratings.count(r) for r in range(1, 6)],
             "unwanted_rate": mean([t.get("unwanted") == "yes" for t in ts]),
-            "confidence": {c: sum(t.get("confidence") == c for t in ts) for c in ("low", "mid", "high")},
             "median_rt_s": (median([t["rt"] for t in ts if t.get("rt")]) or 0) / 1000 or None,
             "marks": [[m["x"], m["y"]] for t in ts for m in t.get("marks", [])],
         })

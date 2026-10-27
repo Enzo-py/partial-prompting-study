@@ -11,7 +11,7 @@ short_description: Human study on unmentioned content in text-to-image prompts
 
 # Partial prompt study: annotation Space
 
-Collection interface for the partial-prompt human study. Participants see a text and an image, give a 1–5 match rating, say whether something should not be there (and click on it), and report their confidence. Built with jsPsych; a small FastAPI backend loads the stimuli from the dataset [`Enzo-py/partial-prompting-ds`](https://huggingface.co/datasets/Enzo-py/partial-prompting-ds), assigns counterbalanced lists and saves responses to a **private dataset repo**.
+Collection interface for the partial-prompt human study. Participants see a text and an image, give a 1–5 match rating, and say whether something should not be there (clicking on it). Built with jsPsych; a small FastAPI backend loads the stimuli from the dataset [`Enzo-py/partial-prompting-ds`](https://huggingface.co/datasets/Enzo-py/partial-prompting-ds), assigns counterbalanced lists and saves responses to a **private dataset repo**.
 
 ## How it works
 
@@ -97,7 +97,7 @@ The stimuli are read once, when the Space starts. After you push new images or p
   "participant": {"source": "prolific", "pid_hash": "3f9a…", "study_id": "…", "english": "fluent", "t2i": "sometimes"},
   "trials": [{
     "position": 1, "sample_id": "S09", "prompt": "an apple on a table",
-    "rating": 4, "unwanted": "yes", "marks": [{"x": 0.147, "y": 0.180}], "confidence": "mid",
+    "rating": 4, "unwanted": "yes", "marks": [{"x": 0.147, "y": 0.180}],
     "rt": 5310, "rt_first_rating": 1820, "rating_changes": 1,
     "case_id": "C7", "category": "C", "subcategory": "Semantic violation", "role": "test", "pair_ids": [], "...": "…"
   }],

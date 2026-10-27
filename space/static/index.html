@@ -133,7 +133,7 @@ class StimulusPlugin {
   constructor(jsPsych) { this.jsPsych = jsPsych; }
   trial(el, t) {
     const s = t.stim, t0 = performance.now();
-    const r = { rating: null, unwanted: null, confidence: null, marks: [], rating_changes: 0, rt_first_rating: null };
+    const r = { rating: null, unwanted: null, marks: [], rating_changes: 0, rt_first_rating: null };
     el.innerHTML = `
       ${t.practice ? `<div class="top"><span class="eyebrow">Practice · this one is not used, it is only to try the questions</span></div>`
                    : `<div class="top"><span class="eyebrow">Image ${t.index + 1} of ${t.total}</span><span class="bar"><i style="width:${100 * t.index / t.total}%"></i></span></div>`}
@@ -146,8 +146,6 @@ class StimulusPlugin {
         <div class="q"><h3>2. Is there anything in the image that should <em>not</em> be there, given the text?</h3>
           <div class="row" role="radiogroup">${radios("unwanted", [["no","No"],["yes","Yes"]], (v, l) => l)}</div>
           <div class="marks" id="marks" hidden></div></div>
-        <div class="q"><h3>3. How sure are you about your answers?</h3>
-          <div class="row" role="radiogroup">${radios("confidence", [["low","Not sure"],["mid","Fairly sure"],["high","Very sure"]], (v, l) => l)}</div></div>
         <div class="nav"><button class="b primary" id="next" disabled>${t.practice ? "Start the study" : t.last ? "Submit my answers" : "Next"}</button></div>
       </div>`;
     window.scrollTo({ top: 0 });
@@ -164,13 +162,12 @@ class StimulusPlugin {
                                            : `<span>Click on the image to mark at least one element.</span>`;
         const c = marksEl.querySelector("#clr"); if (c) c.onclick = () => { r.marks = []; refresh(); };
       } else marksEl.hidden = true;
-      next.disabled = !(r.rating && r.unwanted && r.confidence) || (r.unwanted === "yes" && !r.marks.length);
+      next.disabled = !(r.rating && r.unwanted) || (r.unwanted === "yes" && !r.marks.length);
     };
     el.querySelectorAll('input[name="rating"]').forEach(i => i.onchange = () => {
       if (r.rating !== null) r.rating_changes++; else r.rt_first_rating = Math.round(performance.now() - t0);
       r.rating = +i.value; refresh(); });
     el.querySelectorAll('input[name="unwanted"]').forEach(i => i.onchange = () => { r.unwanted = i.value; if (i.value === "no") r.marks = []; refresh(); });
-    el.querySelectorAll('input[name="confidence"]').forEach(i => i.onchange = () => { r.confidence = i.value; refresh(); });
     stim.addEventListener("click", ev => {
       if (r.unwanted !== "yes") return;
       const b = stim.querySelector("img").getBoundingClientRect();
@@ -180,7 +177,7 @@ class StimulusPlugin {
     });
     next.onclick = () => {
       const data = { trial_kind: t.practice ? "practice" : "stimulus", position: t.index + 1, sample_id: s.sample_id, prompt: s.prompt,
-        rating: r.rating, unwanted: r.unwanted, marks: r.marks, confidence: r.confidence,
+        rating: r.rating, unwanted: r.unwanted, marks: r.marks,
         rating_changes: r.rating_changes,
         rt_first_rating: r.rt_first_rating, rt: Math.round(performance.now() - t0) };
       el.innerHTML = ""; this.jsPsych.finishTrial(data);
@@ -334,7 +331,7 @@ async function main() {
   const timeline = [
     { type: PagePlugin, button: "I agree, continue", html: `
       <div class="prompt"><span class="lbl">Research study · about ${Math.max(3, Math.round(stims.length * 0.4 + rankings.length * 0.5))} minutes</span><q>Does the image match the text?</q></div>
-      <p>This study is part of academic research on how people judge images made by AI image generators. You will see ${stims.length} short texts, each with an image, and answer three quick questions about each.${rankings.length ? ` At the end, you will put a few images in order of preference (${rankings.length} short rankings).` : ""}</p>
+      <p>This study is part of academic research on how people judge images made by AI image generators. You will see ${stims.length} short texts, each with an image, and answer two quick questions about each.${rankings.length ? ` At the end, you will put a few images in order of preference (${rankings.length} short rankings).` : ""}</p>
       <ul class="muted">
         <li>Participation is voluntary and you can stop at any time by closing this page.</li>
         <li>We record your answers, response times and basic browser information. We do not collect your name or email.</li>
