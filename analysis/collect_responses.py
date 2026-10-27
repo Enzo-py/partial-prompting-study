@@ -12,7 +12,8 @@ Adds one column per quality check, the same rules as the Space (space/app.py, `q
 then `n_failed_checks` (each failed attention check counts once) and `excluded` from 3 failed checks. `position` is the presentation order and `rt` the time
 spent on the image (ms, from display to "Next").
 
-Rankings go to a second file (--rankings-out), one row per ranked image: `rank` 1 is the favourite,
+Rankings go to a second file (--rankings-out), one row per ranked image (`image_id` from the dataset
+group, `sample_id` when the image is also a rated stimulus): `rank` 1 is the favourite,
 `shown_position` where the image was on screen, and the session's `excluded` flag.
 """
 import argparse
@@ -33,9 +34,13 @@ rows, ranking_rows = [], []
 for f in sorted(local.glob("responses/list*/*.json")):
     s = json.loads(f.read_text())
     for r in s.get("rankings") or []:
+        # Rankings from dataset groups list image_ids (`order_sample_ids` alongside); older ones list sample_ids.
+        grouped = "order_sample_ids" in r
         for rank, i in enumerate(r.get("order") or [], 1):
             ranking_rows.append({"session_id": s["session_id"], "list_id": s["list_id"], "set_id": r.get("set_id"),
-                                 "prompt": r.get("prompt"), "visual_style": r.get("visual_style"), "sample_id": i,
+                                 "prompt": r.get("prompt"), "visual_style": r.get("visual_style"),
+                                 "image_id": i if grouped else None,
+                                 "sample_id": r["order_sample_ids"][rank - 1] if grouped else i,
                                  "rank": rank, "n_images": len(r["order"]), "shown_position": (r.get("shown") or []).index(i) + 1
                                  if i in (r.get("shown") or []) else None,
                                  "ranking_position": r.get("position"), "rt": r.get("rt"), "resets": r.get("resets")})
@@ -74,4 +79,4 @@ if ranking_rows:
     rk["excluded"] = rk["session_id"].map(df.groupby("session_id")["excluded"].first()).fillna(False)
     rk.to_parquet(args.rankings_out, index=False)
     print(f"{rk.groupby(['session_id', 'set_id']).ngroups} rankings -> {args.rankings_out}")
-    print(rk[~rk.excluded].groupby(["set_id", "sample_id"])["rank"].agg(["count", "mean"]).round(2))
+    print(rk[~rk.excluded].groupby(["set_id", rk.image_id.fillna(rk.sample_id)])["rank"].agg(["count", "mean"]).round(2))

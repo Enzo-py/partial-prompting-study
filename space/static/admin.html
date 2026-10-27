@@ -206,9 +206,9 @@ function render() {
     <p class="sub">Images shown together for one text, ordered by mean rank (1 = favourite). “First” is how often each image was ranked first.</p>
     <div class="rankings">${d.rankings.map(r => `<div class="rset">
       <div class="head"><span class="prompt">${esc(r.prompt)}</span> <span class="muted">${esc(r.set_id)} · n${r.n}</span></div>
-      <div class="rimgs">${r.images.map(im => `<figure title="${esc(im.sample_id)}${im.case_id ? " · " + esc(im.case_id) : ""}">
-        <img src="/stimuli/${encodeURIComponent(im.file_name)}" alt="" loading="lazy">
-        <figcaption>${im.n ? `<b>${fmt(im.mean_rank, 1)}</b> <span class="muted">${pct(im.first)} first</span><br>` : ""}<span class="mono muted">${esc(im.sample_id)}</span></figcaption>
+      <div class="rimgs">${r.images.map(im => `<figure title="${esc(im.image_id)}${im.sample_id ? " · " + esc(im.sample_id) : ""}${im.case_id ? " · " + esc(im.case_id) : ""}">
+        <img src="/stimuli/${im.file_name.split("/").map(encodeURIComponent).join("/")}" alt="" loading="lazy">
+        <figcaption>${im.n ? `<b>${fmt(im.mean_rank, 1)}</b> <span class="muted">${pct(im.first)} first</span><br>` : ""}<span class="mono muted">${esc(im.sample_id || im.image_id)}</span></figcaption>
       </figure>`).join("")}</div>
     </div>`).join("")}</div>
   </section>` : ""}

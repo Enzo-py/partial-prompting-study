@@ -30,7 +30,9 @@ participant ──► Space (public URL, no login)
 
 **Session.** Consent, a two-question profile, instructions, one practice image (`static/practice.svg`, not saved), then the list in random order. Answering *Yes* to question 2 requires clicking at least one element. Leaving or reloading the page asks for confirmation, since it loses the answers. For each image the session stores its `position` (presentation order) and `rt` (time on the image, from display to *Next*).
 
-**Rankings.** After the ratings, each participant ranks `RANKINGS_PER_LIST` sets (default 5): 3 or 4 study images that share a text and a visual style, shown in random order. The question is preference (which image they would rather get from a generator), not match. They tap the images from favourite to least favourite (the last one is placed automatically). Sets come from every text with 3+ study images in one style; larger groups are split round-robin, and a short set borrows images so a group of 5 gives two sets of 3. Sets are spread evenly over the lists, never two with the same text in one list (15 sets today, each in 3 of the 9 lists). They come last so that seeing several images of one text cannot affect the between-subjects ratings. Each ranking saves `set_id`, `shown` (screen order), `order` (favourite first), `rt` and `resets`.
+**Rankings.** After the ratings, each participant ranks `RANKINGS_PER_LIST` groups (default 5). The groups come from the dataset, `groups/groups.jsonl`: one text and its images (`members`, any number from 2; a group with a single image is skipped), so editing that file and restarting the Space changes the rankings. Images that are only in a group (no `sample_id`) are shown only there. The question is preference (which image they would rather get from a generator), not match. They tap the images from favourite to least favourite (the last one is placed automatically), shown in random order. Groups are spread evenly over the lists, never two with the same text in one list (13 groups today, each in 3 or 4 of the 9 lists). They come last so that seeing several images of one text cannot affect the between-subjects ratings. Each ranking saves `set_id` (the `group_id`), `shown` (screen order) and `order` (favourite first) as `image_id`s, `order_sample_ids` (the matching stimulus, null for group-only images), `rt` and `resets`.
+
+**Progress.** Every page shows the same two-step bar, *1 · Rate images* then *2 · Rank images*, with the image or ranking number under it. The page adapts to phones: images fit the screen height, rankings use 2 columns on a phone and one row (up to 5 images) on a wide screen.
 
 **Quality checks.** Each attention check rated as matching counts as one failed check: 3 or more when the named object is absent, 4 or more for a wrong colour, count, relation or binding, since "Partly" (3) is an honest answer there (`CHECK_FAIL_AT`). Checks are judged with the labels saved in the session, so later dataset changes do not affect past sessions. 25% or more of the images answered in under 1 s also counts as a failed check, and so do 99% or more identical ratings. A session is excluded from the statistics and the feedback once it fails 3 checks; fewer are a warning in the dashboard (`FAST_TRIAL_MS`, `FAST_SHARE`, `SAME_ANSWER_SHARE`, `EXCLUDE_AT` in `app.py`; `analysis/collect_responses.py` applies the same rules). Excluded sessions still count towards list progress.
 
@@ -101,8 +103,10 @@ The stimuli are read once, when the Space starts. After you push new images or p
     "rt": 5310, "rt_first_rating": 1820, "rating_changes": 1,
     "case_id": "C7", "category": "C", "subcategory": "Semantic violation", "role": "test", "pair_ids": [], "...": "…"
   }],
-  "rankings": [{"set_id": "R04", "prompt": "a cat to the left of a dog", "position": 1,
-                "shown": ["S68", "S35", "S72"], "order": ["S35", "S72", "S68"], "rt": 9400, "resets": 0}],
+  "rankings": [{"set_id": "GR-SKYSCRAPER", "prompt": "a skyscraper", "position": 1,
+                "shown": ["g13_skyscraper_city", "g32_park_far_skyscraper", "g14_skyscraper_desert"],
+                "order": ["g32_park_far_skyscraper", "g13_skyscraper_city", "g14_skyscraper_desert"],
+                "order_sample_ids": ["S201", "S106", "S107"], "rt": 9400, "resets": 0}],
   "total_time_ms": 240000, "client": {"user_agent": "…", "viewport": "…"}, "received_at": "…"
 }
 ```
