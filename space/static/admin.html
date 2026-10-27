@@ -86,6 +86,12 @@ tr.stim[aria-expanded=true] td{background:var(--accent-soft)}
 .pm .t i{display:block;height:100%;background:var(--accent);border-radius:0 3px 3px 0}
 .pm .v{text-align:right;font-size:12.5px;font-variant-numeric:tabular-nums}
 .fail{color:var(--bad);font-weight:500}
+.rankings{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px 28px}
+.rset{display:flex;flex-direction:column;gap:8px}
+.rimgs{display:flex;gap:8px}
+.rimgs figure{margin:0;flex:1;min-width:0}
+.rimgs img{width:100%;height:auto;display:block;border-radius:4px}
+.rimgs figcaption{font-size:12px;margin-top:4px;line-height:1.35}
 .warn{color:var(--warn)}
 #login{max-width:400px;margin:14vh auto;padding:0 16px;display:flex;flex-direction:column;gap:12px}
 #login form{display:flex;gap:8px}
@@ -194,6 +200,18 @@ function render() {
         <span class="v">${fmt(m.mean)} <span class="muted">n${m.n}</span></span></div>`).join("")}
     </div>`).join("")}</div>
   </section>
+
+  ${d.rankings.length ? `<section class="card">
+    <h2>Rankings</h2>
+    <p class="sub">Images shown together for one text, ordered by mean rank (1 = favourite). “First” is how often each image was ranked first.</p>
+    <div class="rankings">${d.rankings.map(r => `<div class="rset">
+      <div class="head"><span class="prompt">${esc(r.prompt)}</span> <span class="muted">${esc(r.set_id)} · n${r.n}</span></div>
+      <div class="rimgs">${r.images.map(im => `<figure title="${esc(im.sample_id)}${im.case_id ? " · " + esc(im.case_id) : ""}">
+        <img src="/stimuli/${encodeURIComponent(im.file_name)}" alt="" loading="lazy">
+        <figcaption>${im.n ? `<b>${fmt(im.mean_rank, 1)}</b> <span class="muted">${pct(im.first)} first</span><br>` : ""}<span class="mono muted">${esc(im.sample_id)}</span></figcaption>
+      </figure>`).join("")}</div>
+    </div>`).join("")}</div>
+  </section>` : ""}
 
   <section class="card">
     <h2>Stimuli</h2>

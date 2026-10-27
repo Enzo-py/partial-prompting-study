@@ -26,6 +26,7 @@ Environment variables (set them as Space secrets / variables):
   LIST_COUNT, LIST_SIZE     optional; number of lists (default: just enough to show every stimulus) and
                             study images per list (default 20, at most)
   CHECKS_PER_LIST           optional; attention checks per list, rotating (default 4)
+  RANKINGS_PER_LIST         optional; ranking questions after the ratings (default 5, 0 = none)
 """
 import hashlib
 import json
@@ -167,6 +168,8 @@ PUBLIC_FIELDS = ("sample_id", "prompt", "file_name", "visual_style")
 LIST_COUNT = int(os.environ.get("LIST_COUNT") or 0)   # number of lists; 0 = just enough to show every stimulus
 LIST_SIZE = int(os.environ.get("LIST_SIZE", 20))      # study images per list (an upper bound), checks not included
 CHECKS_PER_LIST = int(os.environ.get("CHECKS_PER_LIST", 4))  # attention checks per list, rotating
+RANKINGS_PER_LIST = int(os.environ.get("RANKINGS_PER_LIST", 5))  # ranking questions after the ratings
+RANKING_SIZE = (3, 4)  # images per ranking: at least, at most
 
 
 def in_study(s):
@@ -278,14 +281,53 @@ def build_lists(stimuli):
     return [sorted(c + l) for c, l in zip(check_lists, lists)], checks, not_shown
 
 
+def build_ranking_sets(stimuli):
+    """Ranking questions: 3-4 study images that share a text and a visual style (mixing photos and
+    illustrations would make the style decide). Larger groups are split round-robin; a short last
+    set borrows images from the others, so a group of 5 gives two sets of 3."""
+    groups = defaultdict(list)
+    for s in stimuli:
+        if in_study(s) and not is_attention_check(s):
+            groups[(s["prompt"], s.get("visual_style") or "")].append(s["sample_id"])
+    lo, hi = RANKING_SIZE
+    sets = []
+    for (prompt, style), ids in sorted(groups.items()):
+        if len(ids) < lo:
+            continue
+        ids.sort(key=lambda i: (len(i), i))
+        k = math.ceil(len(ids) / hi)
+        for chunk in (ids[j::k] for j in range(k)):
+            chunk += [i for i in ids if i not in chunk][:max(0, lo - len(chunk))]
+            sets.append({"set_id": f"R{len(sets) + 1:02d}", "prompt": prompt, "visual_style": style or None,
+                         "sample_ids": chunk})
+    return sets
+
+
+def assign_rankings(sets, n_lists):
+    """RANKINGS_PER_LIST sets per list, each set in about as many lists, never two sets with the
+    same text in one list."""
+    if not sets or not RANKINGS_PER_LIST:
+        return [[] for _ in range(n_lists)]
+    ids = [r["set_id"] for r in sets]
+    by_id = {r["set_id"]: r for r in sets}
+    neighbours = {a: {b for b in ids if b != a and by_id[a]["prompt"] == by_id[b]["prompt"]} for a in ids}
+    k = min(RANKINGS_PER_LIST, len({r["prompt"] for r in sets}))
+    return design_lists(ids, neighbours, n_lists, k) or [[] for _ in range(n_lists)]
+
+
 LISTS, CHECKS, NOT_IN_STUDY = build_lists(STIMULI)
 STUDY = [s for s in STIMULI if in_study(s)]
 EXPOSURE = Counter(i for l in LISTS for i in l)
+RANKING_SETS = build_ranking_sets(STIMULI)
+SET_BY_ID = {r["set_id"]: r for r in RANKING_SETS}
+LIST_RANKINGS = assign_rankings(RANKING_SETS, len(LISTS))
 (ROOT / "lists.json").write_text(json.dumps(
     {"n_lists": len(LISTS), "attention_checks": CHECKS, "not_in_study": NOT_IN_STUDY,
-     "exposure": dict(sorted(EXPOSURE.items())), "lists": LISTS}, indent=2))
+     "exposure": dict(sorted(EXPOSURE.items())), "lists": LISTS,
+     "ranking_sets": RANKING_SETS, "list_rankings": LIST_RANKINGS}, indent=2))
 print(f"{len(LISTS)} lists of {sorted({len(l) for l in LISTS})} images, {min(CHECKS_PER_LIST, len(CHECKS))} attention "
-      f"checks each; {len(NOT_IN_STUDY)} stimuli not in the study (human_study = false)")
+      f"checks each; {len(NOT_IN_STUDY)} stimuli not in the study (human_study = false); "
+      f"{len(RANKING_SETS)} ranking sets, {len(LIST_RANKINGS[0])} per list")
 
 
 # ---------------------------------------------------------------- persistence
@@ -343,8 +385,12 @@ async def start(req: Request):
         session_id = uuid.uuid4().hex
         pending[session_id] = (list_id, time.time())
     stimuli = [{k: BY_ID[i].get(k) for k in PUBLIC_FIELDS} for i in LISTS[list_id]]
+    rankings = [{"set_id": r, "prompt": SET_BY_ID[r]["prompt"], "visual_style": SET_BY_ID[r]["visual_style"],
+                 "images": [{k: BY_ID[i].get(k) for k in ("sample_id", "file_name")} for i in SET_BY_ID[r]["sample_ids"]]}
+                for r in LIST_RANKINGS[list_id]]
     return {"session_id": session_id, "list_id": list_id, "study_version": STUDY_VERSION,
-            "stimuli": stimuli, "prolific": bool(body.get("prolific_pid")), "contact": STUDY_CONTACT}
+            "stimuli": stimuli, "rankings": rankings,
+            "prolific": bool(body.get("prolific_pid")), "contact": STUDY_CONTACT}
 
 
 @app.post("/api/submit")
@@ -363,6 +409,13 @@ async def submit(req: Request):
         if s:
             for k in LABEL_FIELDS:
                 t[k] = s.get(k)
+    # Rankings: keep only known sets and their own images, in the order the participant chose.
+    rankings = []
+    for r in body.get("rankings") or []:
+        st = SET_BY_ID.get(r.get("set_id"))
+        if st and sorted(r.get("order") or []) == sorted(st["sample_ids"]):
+            rankings.append({**r, "prompt": st["prompt"], "visual_style": st["visual_style"]})
+    body["rankings"] = rankings
     # Prolific IDs are never saved: only whether the participant came from Prolific, plus an optional
     # salted hash (PID_SALT) that lets the researchers match a Prolific submission to its session.
     participant = body.get("participant") or {}
@@ -548,7 +601,7 @@ def summarize(sessions):
                                               if s.get("total_time_ms")]) or 0) / 60000 or None},
         "lists": [{"list_id": k, "items": len(LISTS[k]), "completed": done[k], "in_progress": active[k]}
                   for k in range(len(LISTS))],
-        "categories": categories, "pairs": pairs, "stimuli": stimuli,
+        "categories": categories, "pairs": pairs, "stimuli": stimuli, "rankings": summarize_rankings(included),
         # No Prolific IDs here: the page only needs to tell sessions apart.
         "sessions": [{"session": str(s.get("session_id", ""))[:8], "list_id": s.get("list_id"),
                       "received_at": s.get("received_at"),
@@ -560,6 +613,25 @@ def summarize(sessions):
                       "flags": flags[id(s)], "excluded": len(flags[id(s)]) >= EXCLUDE_AT}
                      for s in recent],
     }
+
+
+def summarize_rankings(sessions):
+    """Per ranking set: how many times it was ranked, and each image's mean rank (1 = favourite)."""
+    ranks = defaultdict(lambda: defaultdict(list))
+    for s in sessions:
+        for r in s.get("rankings") or []:
+            for k, i in enumerate(r.get("order") or [], 1):
+                ranks[r.get("set_id")][i].append(k)
+    out = []
+    for st in RANKING_SETS:
+        got = ranks[st["set_id"]]
+        images = [{"sample_id": i, "file_name": BY_ID[i]["file_name"], "case_id": BY_ID[i].get("case_id"),
+                   "n": len(got[i]), "mean_rank": mean(got[i]), "first": mean([k == 1 for k in got[i]])}
+                  for i in st["sample_ids"]]
+        images.sort(key=lambda im: (im["mean_rank"] is None, im["mean_rank"] or 0))
+        out.append({**{k: st[k] for k in ("set_id", "prompt", "visual_style")},
+                    "n": max((im["n"] for im in images), default=0), "images": images})
+    return out
 
 
 @app.get("/api/summary")

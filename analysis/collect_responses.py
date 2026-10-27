@@ -11,6 +11,9 @@ Adds one column per quality check, the same rules as the Space (space/app.py, `q
   same_answers            99% or more of the ratings are identical
 then `n_failed_checks` (each failed attention check counts once) and `excluded` from 3 failed checks. `position` is the presentation order and `rt` the time
 spent on the image (ms, from display to "Next").
+
+Rankings go to a second file (--rankings-out), one row per ranked image: `rank` 1 is the favourite,
+`shown_position` where the image was on screen, and the session's `excluded` flag.
 """
 import argparse
 import json
@@ -22,12 +25,20 @@ from huggingface_hub import snapshot_download
 ap = argparse.ArgumentParser()
 ap.add_argument("repo_id")
 ap.add_argument("--out", default="responses.parquet")
+ap.add_argument("--rankings-out", default="rankings.parquet")
 args = ap.parse_args()
 
 local = Path(snapshot_download(args.repo_id, repo_type="dataset", allow_patterns="responses/**"))
-rows = []
+rows, ranking_rows = [], []
 for f in sorted(local.glob("responses/list*/*.json")):
     s = json.loads(f.read_text())
+    for r in s.get("rankings") or []:
+        for rank, i in enumerate(r.get("order") or [], 1):
+            ranking_rows.append({"session_id": s["session_id"], "list_id": s["list_id"], "set_id": r.get("set_id"),
+                                 "prompt": r.get("prompt"), "visual_style": r.get("visual_style"), "sample_id": i,
+                                 "rank": rank, "n_images": len(r["order"]), "shown_position": (r.get("shown") or []).index(i) + 1
+                                 if i in (r.get("shown") or []) else None,
+                                 "ranking_position": r.get("position"), "rt": r.get("rt"), "resets": r.get("resets")})
     p = s.get("participant", {})
     for t in s.get("trials", []):
         rows.append({
@@ -57,3 +68,10 @@ df["excluded"] = df["n_failed_checks"] >= 3
 df.to_parquet(args.out, index=False)
 print(f"{df.session_id.nunique()} sessions ({df[df.excluded].session_id.nunique()} excluded), {len(df)} trials -> {args.out}")
 print(df.groupby(["case_id", "role"])["rating"].agg(["count", "mean", "std"]).round(2))
+
+if ranking_rows:
+    rk = pd.DataFrame(ranking_rows)
+    rk["excluded"] = rk["session_id"].map(df.groupby("session_id")["excluded"].first()).fillna(False)
+    rk.to_parquet(args.rankings_out, index=False)
+    print(f"{rk.groupby(['session_id', 'set_id']).ngroups} rankings -> {args.rankings_out}")
+    print(rk[~rk.excluded].groupby(["set_id", "sample_id"])["rank"].agg(["count", "mean"]).round(2))

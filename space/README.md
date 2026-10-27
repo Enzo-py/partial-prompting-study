@@ -30,6 +30,8 @@ participant ──► Space (public URL, no login)
 
 **Session.** Consent, a two-question profile, instructions, one practice image (`static/practice.svg`, not saved), then the list in random order. Answering *Yes* to question 2 requires clicking at least one element. Leaving or reloading the page asks for confirmation, since it loses the answers. For each image the session stores its `position` (presentation order) and `rt` (time on the image, from display to *Next*).
 
+**Rankings.** After the ratings, each participant ranks `RANKINGS_PER_LIST` sets (default 5): 3 or 4 study images that share a text and a visual style, shown in random order. The question is preference (which image they would rather get from a generator), not match. They tap the images from favourite to least favourite (the last one is placed automatically). Sets come from every text with 3+ study images in one style; larger groups are split round-robin, and a short set borrows images so a group of 5 gives two sets of 3. Sets are spread evenly over the lists, never two with the same text in one list (15 sets today, each in 3 of the 9 lists). They come last so that seeing several images of one text cannot affect the between-subjects ratings. Each ranking saves `set_id`, `shown` (screen order), `order` (favourite first), `rt` and `resets`.
+
 **Quality checks.** Each attention check rated as matching counts as one failed check: 3 or more when the named object is absent, 4 or more for a wrong colour, count, relation or binding, since "Partly" (3) is an honest answer there (`CHECK_FAIL_AT`). Checks are judged with the labels saved in the session, so later dataset changes do not affect past sessions. 25% or more of the images answered in under 1 s also counts as a failed check, and so do 99% or more identical ratings. A session is excluded from the statistics and the feedback once it fails 3 checks; fewer are a warning in the dashboard (`FAST_TRIAL_MS`, `FAST_SHARE`, `SAME_ANSWER_SHARE`, `EXCLUDE_AT` in `app.py`; `analysis/collect_responses.py` applies the same rules). Excluded sessions still count towards list progress.
 
 **Prolific IDs are not saved.** The ID is used only to show the completion code. The session stores `source` (`prolific` or `direct`) and, if the `PID_SALT` secret is set, `pid_hash`: a salted hash that lets you find the session of a given Prolific submission (to reject or bonus it) by hashing its ID with the same salt, without the ID being in the data.
@@ -57,6 +59,7 @@ participant ──► Space (public URL, no login)
    | `PID_SALT` | Secret | optional, any long random string; saves a hash of the Prolific ID instead of nothing |
    | `LIST_COUNT` / `LIST_SIZE` | Variable | optional, number of lists (default: enough to show every stimulus) and study images per list (default 20, at most) |
    | `CHECKS_PER_LIST` | Variable | optional, attention checks per list (default 4) |
+   | `RANKINGS_PER_LIST` | Variable | optional, ranking questions after the ratings (default 5, 0 = none) |
 
 5. **Deploy.** Pushing to `main` on GitHub deploys this folder automatically (see the repository README). To deploy by hand from the repository root:
    ```bash
@@ -98,6 +101,8 @@ The stimuli are read once, when the Space starts. After you push new images or p
     "rt": 5310, "rt_first_rating": 1820, "rating_changes": 1,
     "case_id": "C7", "category": "C", "subcategory": "Semantic violation", "role": "test", "pair_ids": [], "...": "…"
   }],
+  "rankings": [{"set_id": "R04", "prompt": "a cat to the left of a dog", "position": 1,
+                "shown": ["S68", "S35", "S72"], "order": ["S35", "S72", "S68"], "rt": 9400, "resets": 0}],
   "total_time_ms": 240000, "client": {"user_agent": "…", "viewport": "…"}, "received_at": "…"
 }
 ```
@@ -120,7 +125,7 @@ The page asks for `ADMIN_KEY` and stays closed until that secret is set. It read
 ```bash
 python analysis/collect_responses.py Enzo-py/partial-prompting-responses --out responses.parquet
 ```
-Downloads every session, flattens to one row per trial, and adds one column per quality check plus `n_failed_checks` and `excluded`.
+Downloads every session, flattens to one row per trial, and adds one column per quality check plus `n_failed_checks` and `excluded`. Rankings go to `rankings.parquet`, one row per ranked image.
 
 ## Files
 

@@ -58,6 +58,12 @@ h1{font-size:22px;font-weight:600;line-height:1.3;margin:0 0 8px}
 .opt input:focus-visible + label{outline:2px solid var(--accent);outline-offset:2px}
 .marks{display:flex;gap:10px;align-items:center;font-size:13px;color:var(--muted)}
 .nav{display:flex;justify-content:flex-end;gap:10px}
+.rank{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.rk{position:relative;display:block;padding:0;border:3px solid transparent;border-radius:6px;background:none;cursor:pointer;line-height:0;overflow:hidden}
+.rk img{width:100%;height:auto;display:block;border-radius:3px}
+.rk.on{border-color:var(--accent)}
+.rk:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.rk .badge{position:absolute;top:6px;left:6px;width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--bg);font:600 16px/30px var(--font);text-align:center}
 .fb{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:20px}
 .fbcase{display:grid;grid-template-columns:minmax(0,200px) 1fr;gap:16px;align-items:start;margin-top:4px}
 .fbtext{display:flex;flex-direction:column;gap:6px}
@@ -123,7 +129,7 @@ class ProfilePlugin {
 class StimulusPlugin {
   static info = { name: "stimulus", parameters: {
     stim: { type: PT.OBJECT, default: undefined }, index: { type: PT.INT, default: 0 }, total: { type: PT.INT, default: 0 },
-    practice: { type: PT.BOOL, default: false } } };
+    practice: { type: PT.BOOL, default: false }, last: { type: PT.BOOL, default: false } } };
   constructor(jsPsych) { this.jsPsych = jsPsych; }
   trial(el, t) {
     const s = t.stim, t0 = performance.now();
@@ -142,7 +148,7 @@ class StimulusPlugin {
           <div class="marks" id="marks" hidden></div></div>
         <div class="q"><h3>3. How sure are you about your answers?</h3>
           <div class="row" role="radiogroup">${radios("confidence", [["low","Not sure"],["mid","Fairly sure"],["high","Very sure"]], (v, l) => l)}</div></div>
-        <div class="nav"><button class="b primary" id="next" disabled>${t.practice ? "Start the study" : t.index + 1 === t.total ? "Submit my answers" : "Next"}</button></div>
+        <div class="nav"><button class="b primary" id="next" disabled>${t.practice ? "Start the study" : t.last ? "Submit my answers" : "Next"}</button></div>
       </div>`;
     window.scrollTo({ top: 0 });
     const stim = el.querySelector("#stim"), marksEl = el.querySelector("#marks"), next = el.querySelector("#next");
@@ -182,6 +188,55 @@ class StimulusPlugin {
   }
 }
 
+// Several images for one text: tap them from favourite to least favourite. Tapping a ranked image
+// takes it out; the last one is placed automatically.
+class RankingPlugin {
+  static info = { name: "ranking", parameters: {
+    set: { type: PT.OBJECT, default: undefined }, index: { type: PT.INT, default: 0 }, total: { type: PT.INT, default: 0 },
+    last: { type: PT.BOOL, default: false } } };
+  constructor(jsPsych) { this.jsPsych = jsPsych; }
+  trial(el, t) {
+    const r = t.set, t0 = performance.now();
+    const shown = this.jsPsych.randomization.shuffle(r.images);
+    let order = [], resets = 0;
+    el.innerHTML = `
+      <div class="top"><span class="eyebrow">Ranking ${t.index + 1} of ${t.total}</span><span class="bar"><i style="width:${100 * t.index / t.total}%"></i></span></div>
+      <div class="card">
+        <div class="prompt"><span class="lbl">Text</span><q class="text">${esc(r.prompt)}</q></div>
+        ${r.visual_style ? `<div class="style"><span class="tag">${esc(styleLabel(r.visual_style))}</span>Judge what is shown, not the drawing style.</div>` : ""}
+        <p>Which of these would you rather get from an image generator for this text? Tap them from your favourite to your least favourite.</p>
+        <div class="rank">${shown.map(im => `<button type="button" class="rk" data-id="${esc(im.sample_id)}"><img src="/stimuli/${encodeURIComponent(im.file_name)}" alt="" draggable="false"><span class="badge" hidden></span></button>`).join("")}</div>
+        <div class="marks" id="status"></div>
+        <div class="nav"><button class="b" id="reset">Start over</button><button class="b primary" id="next" disabled>${t.last ? "Submit my answers" : "Next"}</button></div>
+      </div>`;
+    window.scrollTo({ top: 0 });
+    const next = el.querySelector("#next"), status = el.querySelector("#status");
+    const ordinal = n => ["first", "second", "third", "fourth"][n - 1] || `#${n}`;
+    const refresh = () => {
+      el.querySelectorAll(".rk").forEach(b => {
+        const k = order.indexOf(b.dataset.id), badge = b.querySelector(".badge");
+        badge.hidden = k < 0; badge.textContent = k + 1; b.classList.toggle("on", k >= 0);
+        b.setAttribute("aria-label", k < 0 ? "Not ranked yet" : `Ranked ${k + 1}`);
+      });
+      status.textContent = order.length < shown.length ? `Tap the image you would put ${ordinal(order.length + 1)}.` : "Done. Tap an image to take it out, or Start over.";
+      next.disabled = order.length !== shown.length;
+    };
+    el.querySelectorAll(".rk").forEach(b => b.onclick = () => {
+      const id = b.dataset.id;
+      order = order.includes(id) ? order.filter(x => x !== id) : [...order, id];
+      if (order.length === shown.length - 1) order.push(shown.find(im => !order.includes(im.sample_id)).sample_id);
+      refresh();
+    });
+    el.querySelector("#reset").onclick = () => { if (order.length) resets++; order = []; refresh(); };
+    next.onclick = () => {
+      el.innerHTML = "";
+      this.jsPsych.finishTrial({ trial_kind: "ranking", set_id: r.set_id, position: t.index + 1,
+        shown: shown.map(im => im.sample_id), order, resets, rt: Math.round(performance.now() - t0) });
+    };
+    refresh();
+  }
+}
+
 /* ---------------------------------------------------------------- run */
 const jsPsych = initJsPsych({ display_element: "jspsych-target", on_finish: () => submit() });
 const P = {
@@ -201,6 +256,7 @@ async function submit() {
     session_id: SESSION.session_id, list_id: SESSION.list_id,
     participant: { ...P, english: profile.english, t2i: profile.t2i },
     trials: all.filter({ trial_kind: "stimulus" }).values().map(({ trial_kind, trial_type, trial_index, time_elapsed, internal_node_id, ...d }) => d),
+    rankings: all.filter({ trial_kind: "ranking" }).values().map(({ trial_kind, trial_type, trial_index, time_elapsed, internal_node_id, ...d }) => d),
     total_time_ms: Math.round(all.last(1).values()[0].time_elapsed),
     client: { user_agent: navigator.userAgent, screen: `${screen.width}x${screen.height}`, viewport: `${innerWidth}x${innerHeight}`,
               language: navigator.language, finished_at: new Date().toISOString() },
@@ -269,14 +325,16 @@ async function main() {
     return;
   }
   // preload every image before the first trial
-  await Promise.all(SESSION.stimuli.map(s => new Promise(ok => { const i = new Image(); i.onload = i.onerror = ok; i.src = "/stimuli/" + encodeURIComponent(s.file_name); })));
+  const rankings = jsPsych.randomization.shuffle(SESSION.rankings || []);
+  const files = [...SESSION.stimuli, ...rankings.flatMap(r => r.images)].map(s => s.file_name);
+  await Promise.all([...new Set(files)].map(f => new Promise(ok => { const i = new Image(); i.onload = i.onerror = ok; i.src = "/stimuli/" + encodeURIComponent(f); })));
 
   const stims = jsPsych.randomization.shuffle(SESSION.stimuli);
   addEventListener("beforeunload", leaveGuard);
   const timeline = [
     { type: PagePlugin, button: "I agree, continue", html: `
-      <div class="prompt"><span class="lbl">Research study · about ${Math.max(3, Math.round(stims.length * 0.4))} minutes</span><q>Does the image match the text?</q></div>
-      <p>This study is part of academic research on how people judge images made by AI image generators. You will see ${stims.length} short texts, each with an image, and answer three quick questions about each.</p>
+      <div class="prompt"><span class="lbl">Research study · about ${Math.max(3, Math.round(stims.length * 0.4 + rankings.length * 0.5))} minutes</span><q>Does the image match the text?</q></div>
+      <p>This study is part of academic research on how people judge images made by AI image generators. You will see ${stims.length} short texts, each with an image, and answer three quick questions about each.${rankings.length ? ` At the end, you will put a few images in order of preference (${rankings.length} short rankings).` : ""}</p>
       <ul class="muted">
         <li>Participation is voluntary and you can stop at any time by closing this page.</li>
         <li>We record your answers, response times and basic browser information. We do not collect your name or email.</li>
@@ -295,7 +353,15 @@ async function main() {
       </ul>
       <p class="muted">The first image is a practice round.</p>` },
     { type: StimulusPlugin, practice: true, stim: { sample_id: "practice", prompt: "a house", src: "/static/practice.svg", visual_style: "svg-illustration" } },
-    ...stims.map((s, i) => ({ type: StimulusPlugin, stim: s, index: i, total: stims.length })),
+    ...stims.map((s, i) => ({ type: StimulusPlugin, stim: s, index: i, total: stims.length, last: !rankings.length && i === stims.length - 1 })),
+    ...(rankings.length ? [{ type: PagePlugin, button: "Start", html: `
+      <div class="prompt"><span class="lbl">Last part</span><q>Which image would you prefer?</q></div>
+      <p>You will now see several images for the same text. Imagine you typed the text into an image generator and got all of them back.</p>
+      <ul>
+        <li>Tap the images in order, from the one you would most like to keep to the one you would least like.</li>
+        <li>Go with your own preference. There are no right or wrong answers.</li>
+      </ul>` }] : []),
+    ...rankings.map((r, i) => ({ type: RankingPlugin, set: r, index: i, total: rankings.length, last: i === rankings.length - 1 })),
   ];
   await jsPsych.run(timeline);
 }
