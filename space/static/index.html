@@ -221,21 +221,22 @@ class StimulusPlugin {
 class RankingPlugin {
   static info = { name: "ranking", parameters: {
     set: { type: PT.OBJECT, default: undefined }, index: { type: PT.INT, default: 0 }, total: { type: PT.INT, default: 0 },
-    last: { type: PT.BOOL, default: false } } };
+    practice: { type: PT.BOOL, default: false }, last: { type: PT.BOOL, default: false } } };
   constructor(jsPsych) { this.jsPsych = jsPsych; }
   trial(el, t) {
     const r = t.set, t0 = performance.now();
     const shown = this.jsPsych.randomization.shuffle(r.images);
     let order = [], resets = 0;
     el.innerHTML = `
-      ${progress({ on: 2, rate: 1, rank: t.index / t.total, note: `Ranking ${t.index + 1} of ${t.total}` })}
+      ${progress(t.practice ? { on: 2, rate: 1, note: "Practice · this one is not used, it is only to try the ranking" }
+                            : { on: 2, rate: 1, rank: t.index / t.total, note: `Ranking ${t.index + 1} of ${t.total}` })}
       <div class="card">
         <div class="prompt"><span class="lbl">Text</span><q class="text">${esc(r.prompt)}</q></div>
         ${r.visual_style ? `<div class="style"><span class="tag">${esc(styleLabel(r.visual_style))}</span>Judge what is shown, not the drawing style.</div>` : ""}
         <p>Which of these would you rather get from an image generator for this text? Tap them from your favourite to your least favourite.</p>
-        <div class="rank" style="--cols:${shown.length === 4 ? 2 : Math.min(shown.length, 3)}">${shown.map(im => `<button type="button" class="rk" data-id="${esc(im.image_id)}"><img src="${src(im.file_name)}" alt="" draggable="false"><span class="badge" hidden></span></button>`).join("")}</div>
+        <div class="rank" style="--cols:${shown.length === 4 ? 2 : Math.min(shown.length, 3)}">${shown.map(im => `<button type="button" class="rk" data-id="${esc(im.image_id)}"><img src="${im.src || src(im.file_name)}" alt="" draggable="false"><span class="badge" hidden></span></button>`).join("")}</div>
         <div class="marks" id="status"></div>
-        <div class="nav"><button class="b" id="reset">Start over</button><button class="b primary" id="next" disabled>${t.last ? "Submit my answers" : "Next"}</button></div>
+        <div class="nav"><button class="b" id="reset">Start over</button><button class="b primary" id="next" disabled>${t.practice ? "Start the ranking" : t.last ? "Submit my answers" : "Next"}</button></div>
       </div>`;
     window.scrollTo({ top: 0 });
     const next = el.querySelector("#next"), status = el.querySelector("#status");
@@ -257,7 +258,7 @@ class RankingPlugin {
     el.querySelector("#reset").onclick = () => { if (order.length) resets++; order = []; refresh(); };
     next.onclick = () => {
       el.innerHTML = "";
-      this.jsPsych.finishTrial({ trial_kind: "ranking", set_id: r.set_id, position: t.index + 1,
+      this.jsPsych.finishTrial({ trial_kind: t.practice ? "practice_ranking" : "ranking", set_id: r.set_id, position: t.index + 1,
         shown: shown.map(im => im.image_id), order, resets, rt: Math.round(performance.now() - t0) });
     };
     refresh();
@@ -383,11 +384,11 @@ async function main() {
       </div>
       <ul>
         <li>Judge only <b>how well the image matches what the text asks for</b>, not how beautiful or realistic it is.</li>
-        <li>If something in the image should not be there given the text, answer <b>Yes</b> to question 2 and click on it.</li>
+        <li>Question 2: if the image shows something that does not belong there given the text, answer <b>Yes</b>, then click (or tap) on that thing in the image to mark it. Otherwise answer <b>No</b>.</li>
         <li>Go with your first impression.</li>
       </ul>
       <p class="muted">The first image is a practice round.</p>`, progress: { on: 1, note: "Instructions" } },
-    { type: StimulusPlugin, practice: true, stim: { sample_id: "practice", prompt: "a house", src: "/static/practice.svg", visual_style: "svg-illustration" } },
+    { type: StimulusPlugin, practice: true, stim: { sample_id: "practice", prompt: "A butterfly on a flower", src: "/static/practice/butterfly.jpg", visual_style: "photo" } },
     ...stims.map((s, i) => ({ type: StimulusPlugin, stim: s, index: i, total: stims.length, last: !rankings.length && i === stims.length - 1 })),
     ...(rankings.length ? [{ type: PagePlugin, button: "Start", progress: { on: 2, rate: 1, note: "Instructions" }, html: `
       <div class="prompt"><span class="lbl">Last part</span><q>Which image would you prefer?</q></div>
@@ -400,7 +401,10 @@ async function main() {
       <ul>
         <li>Tap the images in order, from the one you would most like to keep to the one you would least like.</li>
         <li>Go with your own preference.</li>
-      </ul>` }] : []),
+      </ul>
+      <p class="muted">The first ranking is a practice round.</p>` },
+      { type: RankingPlugin, practice: true, set: { set_id: "practice", prompt: "A butterfly on a flower", visual_style: "photo",
+        images: ["butterfly", "macaw", "bluebird"].map(n => ({ image_id: n, src: `/static/practice/${n}.jpg` })) } }] : []),
     ...rankings.map((r, i) => ({ type: RankingPlugin, set: r, index: i, total: rankings.length, last: i === rankings.length - 1 })),
   ];
   await jsPsych.run(timeline);
