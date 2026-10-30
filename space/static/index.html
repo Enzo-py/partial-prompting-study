@@ -48,6 +48,7 @@ h1{font-size:22px;font-weight:600;line-height:1.3;margin:0 0 8px}
 .stim img{display:block;width:auto;height:auto;max-width:100%;max-height:65vh}
 .stim.marking{cursor:crosshair;outline:2px solid var(--warn);outline-offset:-2px}
 .stim .mk{position:absolute;width:28px;height:28px;margin:-14px 0 0 -14px;border:4px solid #ff7a1a;border-radius:50%;box-sizing:border-box;pointer-events:none}
+.stim canvas.seg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .stim .hint{position:absolute;left:8px;bottom:8px;line-height:1.3;background:var(--bg);color:var(--warn);font-size:13px;padding:4px 8px;border-radius:4px}
 .style{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:-14px}
 .style .tag{font-size:12px;font-weight:500;color:var(--ink);background:var(--hover);border-radius:4px;padding:2px 8px;white-space:nowrap}
@@ -123,12 +124,49 @@ const progress = ({ rate = 0, rank = 0, on = 0, note = "" } = {}) => `
 // Image loading: each step's images start loading on the text page before it; a trial whose images
 // are not there yet shows a loading screen until they are.
 const imageURL = im => im.src || src(im.file_name);
-const LOADS = new Map(), LOADED = new Set();
+const LOADS = new Map(), LOADED = new Set(), IMAGES = new Map();
 const load = url => {
   if (!LOADS.has(url)) LOADS.set(url, new Promise(ok => {
-    const i = new Image(); i.onload = i.onerror = () => { LOADED.add(url); ok(); }; i.src = url; }));
+    const i = new Image(); IMAGES.set(url, i); i.onload = i.onerror = () => { LOADED.add(url); ok(); }; i.src = url; }));
   return LOADS.get(url);
 };
+const stimURLs = s => [imageURL(s), ...(s.seg_file ? [src(s.seg_file)] : [])];
+// A loaded segmentation map: idAt(x, y) for x, y in 0..1, and draw() on a canvas laid over the image:
+// once something is selected the rest of the image is dimmed and the selected parts are outlined, so
+// the selection shows whatever the colours of the image; the part under the mouse is outlined lightly.
+const SEGMAPS = new Map();
+function segmentMap(url) {
+  if (SEGMAPS.has(url)) return SEGMAPS.get(url);
+  const img = IMAGES.get(url), w = img.naturalWidth, h = img.naturalHeight;
+  if (!w) return null;
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const ctx = c.getContext("2d", { willReadFrequently: true }); ctx.drawImage(img, 0, 0);
+  const px = ctx.getImageData(0, 0, w, h).data, ids = new Uint32Array(w * h);
+  for (let k = 0; k < ids.length; k++) ids[k] = px[4 * k] + 256 * px[4 * k + 1] + 65536 * px[4 * k + 2];
+  const map = {
+    w, h,
+    idAt: (x, y) => ids[Math.min(h - 1, Math.floor(y * h)) * w + Math.min(w - 1, Math.floor(x * w))],
+    draw(canvas, selected, hover) {
+      const g = canvas.getContext("2d"), out = g.createImageData(w, h), d = out.data, sel = new Set(selected);
+      for (let k = 0; k < ids.length; k++) {
+        const id = ids[k], on = sel.has(id);
+        if (!on && id !== hover && !sel.size) continue;
+        const x = k % w, edge = (x > 0 && ids[k - 1] !== id) || (x < w - 1 && ids[k + 1] !== id) ||
+                                (k >= w && ids[k - w] !== id) || (k < ids.length - w && ids[k + w] !== id) ||
+                                (x > 1 && ids[k - 2] !== id) || (x < w - 2 && ids[k + 2] !== id) ||
+                                (k >= 2 * w && ids[k - 2 * w] !== id) || (k < ids.length - 2 * w && ids[k + 2 * w] !== id);
+        let c = null;
+        if (on) c = edge ? [255, 122, 26, 255] : null;               // selected: bright, outlined
+        else if (id && id === hover) c = edge ? [255, 255, 255, 230] : [255, 255, 255, 60];
+        else c = [0, 0, 0, 120];                                     // dim the rest
+        if (c) { d[4 * k] = c[0]; d[4 * k + 1] = c[1]; d[4 * k + 2] = c[2]; d[4 * k + 3] = c[3]; }
+      }
+      g.putImageData(out, 0, 0);
+    },
+  };
+  SEGMAPS.set(url, map);
+  return map;
+}
 const preload = urls => urls.forEach(load);
 async function whenLoaded(el, urls, prog) {
   if (urls.every(u => LOADED.has(u))) return;
@@ -176,13 +214,16 @@ class ProfilePlugin {
   }
 }
 
+// Question 2 marks what does not fit: on images with a segmentation (`seg_file`, COCO panoptic: segment
+// id = R + 256·G + 256²·B) a click selects or unselects the whole segment under it; on other images
+// it places a point.
 class StimulusPlugin {
   static info = { name: "stimulus", parameters: {
     stim: { type: PT.OBJECT, default: undefined }, index: { type: PT.INT, default: 0 }, total: { type: PT.INT, default: 0 },
     practice: { type: PT.BOOL, default: false }, last: { type: PT.BOOL, default: false } } };
   constructor(jsPsych) { this.jsPsych = jsPsych; }
   trial(el, t) {
-    return whenLoaded(el, [imageURL(t.stim)], this.prog(t)).then(() => this.show(el, t));
+    return whenLoaded(el, stimURLs(t.stim), this.prog(t)).then(() => this.show(el, t));
   }
   prog(t) {
     return t.practice ? { on: 1, note: "Practice · this one is not used, it is only to try the questions" }
@@ -190,50 +231,74 @@ class StimulusPlugin {
   }
   show(el, t) {
     const s = t.stim, t0 = performance.now();
-    const r = { rating: null, problem: null, marks: [], rating_changes: 0, rt_first_rating: null };
+    const seg = s.seg_file ? segmentMap(src(s.seg_file)) : null;
+    const r = { rating: null, problem: null, marks: [], segments: [], rating_changes: 0, rt_first_rating: null };
     el.innerHTML = `
       ${progress(this.prog(t))}
       <div class="card">
         <div class="prompt"><span class="lbl">Text</span><q class="text">${esc(s.prompt)}</q></div>
         ${s.visual_style ? `<div class="style"><span class="tag">${esc(styleLabel(s.visual_style))}</span>Judge what is shown, not the drawing style.</div>` : ""}
-        <div class="stim" id="stim"><img src="${imageURL(s)}" alt="" draggable="false"></div>
+        <div class="stim" id="stim"><img src="${imageURL(s)}" alt="" draggable="false">${seg ? `<canvas class="seg" width="${seg.w}" height="${seg.h}"></canvas>` : ""}</div>
         <div class="q"><h3>1. How well does the image match the text?</h3>
           <div class="likert" role="radiogroup">${radios("rating", [[1,"Does not match"],[2,"Poorly"],[3,"Partly"],[4,"Mostly"],[5,"Fully matches"]], (v, l) => `<b>${v}</b>${l}`)}</div></div>
-        <div class="q"><h3>2. Is any part of the image a problem, or does not match the text?</h3>
+        <div class="q"><h3>2. Does any part of the image not fit the text?</h3>
           <div class="row" role="radiogroup">${radios("problem", [["no","No"],["yes","Yes"]], (v, l) => l)}</div>
           <div class="marks" id="marks" hidden></div></div>
         <div class="nav"><button class="b primary" id="next" disabled>${t.practice ? "Start the study" : t.last ? "Submit my answers" : "Next"}</button></div>
       </div>`;
     window.scrollTo({ top: 0 });
     const stim = el.querySelector("#stim"), marksEl = el.querySelector("#marks"), next = el.querySelector("#next");
+    const canvas = stim.querySelector("canvas.seg");
+    const tap = matchMedia("(pointer: coarse)").matches ? "Tap" : "Click";
+    let hover = 0;
+    const count = () => seg ? r.segments.length : r.marks.length;
     const refresh = () => {
       const marking = r.problem === "yes";
       stim.classList.toggle("marking", marking);
       stim.querySelectorAll(".mk,.hint").forEach(n => n.remove());
-      r.marks.forEach(m => { const d = document.createElement("div"); d.className = "mk"; d.style.left = (m.x * 100) + "%"; d.style.top = (m.y * 100) + "%"; stim.appendChild(d); });
+      if (seg) seg.draw(canvas, r.segments, marking ? hover : 0);
+      else r.marks.forEach(m => { const d = document.createElement("div"); d.className = "mk"; d.style.left = (m.x * 100) + "%"; d.style.top = (m.y * 100) + "%"; stim.appendChild(d); });
       if (marking) {
-        const h = document.createElement("span"); h.className = "hint"; h.textContent = (matchMedia("(pointer: coarse)").matches ? "Tap" : "Click") + " each area that is a problem"; stim.appendChild(h);
+        const h = document.createElement("span"); h.className = "hint"; h.textContent = `${tap} each part that does not fit`; stim.appendChild(h);
         marksEl.hidden = false;
-        marksEl.innerHTML = r.marks.length ? `<span>${r.marks.length} area${r.marks.length === 1 ? "" : "s"} marked</span><button class="link" id="clr">Clear</button>`
-                                           : `<span>Mark at least one area on the image.</span>`;
-        const c = marksEl.querySelector("#clr"); if (c) c.onclick = () => { r.marks = []; refresh(); };
+        const n = count(), what = seg ? "part" : "area";
+        marksEl.innerHTML = n ? `<span>${n} ${what}${n === 1 ? "" : "s"} selected${seg ? ` · ${tap.toLowerCase()} a part again to unselect it` : ""}</span><button class="link" id="clr">Clear</button>`
+                              : `<span>Select at least one ${what} on the image.</span>`;
+        const c = marksEl.querySelector("#clr"); if (c) c.onclick = () => { r.marks = []; r.segments = []; refresh(); };
       } else marksEl.hidden = true;
-      next.disabled = !(r.rating && r.problem) || (r.problem === "yes" && !r.marks.length);
+      next.disabled = !(r.rating && r.problem) || (r.problem === "yes" && !count());
     };
     el.querySelectorAll('input[name="rating"]').forEach(i => i.onchange = () => {
       if (r.rating !== null) r.rating_changes++; else r.rt_first_rating = Math.round(performance.now() - t0);
       r.rating = +i.value; refresh(); });
-    el.querySelectorAll('input[name="problem"]').forEach(i => i.onchange = () => { r.problem = i.value; if (i.value === "no") r.marks = []; refresh(); });
-    stim.addEventListener("click", ev => {
-      if (r.problem !== "yes") return;
+    el.querySelectorAll('input[name="problem"]').forEach(i => i.onchange = () => { r.problem = i.value; if (i.value === "no") { r.marks = []; r.segments = []; } refresh(); });
+    const at = ev => {
       const b = stim.querySelector("img").getBoundingClientRect();
       const x = (ev.clientX - b.left) / b.width, y = (ev.clientY - b.top) / b.height;
-      if (x < 0 || x > 1 || y < 0 || y > 1) return;
-      r.marks.push({ x: +x.toFixed(4), y: +y.toFixed(4) }); refresh();
+      return x < 0 || x > 1 || y < 0 || y > 1 ? null : { x: +x.toFixed(4), y: +y.toFixed(4) };
+    };
+    stim.addEventListener("click", ev => {
+      if (r.problem !== "yes") return;
+      const p = at(ev); if (!p) return;
+      if (seg) {
+        const id = seg.idAt(p.x, p.y); if (!id) return;
+        const k = r.segments.indexOf(id);
+        if (k < 0) { r.segments.push(id); r.marks.push({ ...p, segment: id }); }
+        else { r.segments.splice(k, 1); r.marks = r.marks.filter(m => m.segment !== id); }
+      } else r.marks.push(p);
+      refresh();
     });
+    if (seg) {
+      stim.addEventListener("mousemove", ev => {
+        if (r.problem !== "yes") return;
+        const p = at(ev), id = p ? seg.idAt(p.x, p.y) : 0;
+        if (id !== hover) { hover = id; seg.draw(canvas, r.segments, hover); }
+      });
+      stim.addEventListener("mouseleave", () => { if (hover) { hover = 0; seg.draw(canvas, r.segments, 0); } });
+    }
     next.onclick = () => {
       const data = { trial_kind: t.practice ? "practice" : "stimulus", position: t.index + 1, sample_id: s.sample_id, prompt: s.prompt,
-        rating: r.rating, problem: r.problem, marks: r.marks,
+        rating: r.rating, problem: r.problem, marking: seg ? "segments" : "points", marks: r.marks, segments: r.segments,
         rating_changes: r.rating_changes,
         rt_first_rating: r.rt_first_rating, rt: Math.round(performance.now() - t0) };
       el.innerHTML = ""; this.jsPsych.finishTrial(data);
@@ -391,7 +456,7 @@ async function main() {
     images: ["butterfly", "macaw", "bluebird"].map(n => ({ image_id: n, src: `/static/practice/${n}.jpg` })) };
   // Step 1 images load while the participant reads the consent and instructions, step 2 images on
   // the ranking instructions, in the order they will be shown.
-  const rateImages = [practiceStim, ...stims].map(imageURL);
+  const rateImages = [practiceStim, ...stims].flatMap(stimURLs);
   const rankImages = [practiceSet, ...rankings].flatMap(r => r.images.map(imageURL));
   addEventListener("beforeunload", leaveGuard);
   const timeline = [
@@ -419,7 +484,7 @@ async function main() {
       <p>For each image, you answer two questions:</p>
       <ol>
         <li><b>How well does the image match the text?</b> Choose a score from 1 (does not match) to 5 (fully matches).</li>
-        <li><b>Is any part of the image a problem, or does not match the text?</b> If yes, click (or tap) on each of these areas in the image to mark them. If not, answer <b>No</b>.</li>
+        <li><b>Does any part of the image not fit the text?</b> If yes, click (or tap) on each part that does not fit to select it; on most images the whole object or region is selected at once. If not, answer <b>No</b>.</li>
       </ol>
       <ul>
         <li>Positions such as <b>left</b>, <b>right</b>, <b>above</b> or <b>below</b> are meant from your point of view as you look at the image, not from the point of view of someone or something in it.</li>

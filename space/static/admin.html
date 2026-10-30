@@ -288,6 +288,7 @@ function detail(s) {
       <dt>Category</dt><dd><span class="tag">${esc(s.category)}</span> ${esc(s.category_name)} · ${esc(s.subcategory)}</dd>
       <dt>Ratings</dt><dd>${s.dist.map((n, i) => `${i + 1}: <b>${n}</b>`).join(" · ")}</dd>
       <dt>Click marks</dt><dd>${s.marks.length}</dd>
+      ${s.segments && s.segments.length ? `<dt>Parts selected</dt><dd>${s.segments.map(([c, n]) => `${esc(c)} ${n}`).join(", ")}</dd>` : ""}
     </dl></div></td></tr>`;
 }
 

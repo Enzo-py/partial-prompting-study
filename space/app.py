@@ -210,6 +210,34 @@ def load_groups(sha, repo_files):
     return groups
 
 
+def load_segments(sha, repo_files, stimuli):
+    """Segmentations from the dataset (`segmentation/<image_id>.png` + `.json`, COCO panoptic). For each
+    stimulus whose image has one, the map is copied to STIM_DIR/seg/<image_id>.png (`seg_file`) so that
+    question 2 can let participants pick segments instead of clicking points. The category names stay
+    server-side; returns {image_id: {segment id: {category, names, isthing}}}."""
+    wanted = sorted({s["image_id"] for s in stimuli if in_study(s)}
+                    & {f[len("segmentation/"):-5] for f in repo_files
+                       if f.startswith("segmentation/") and f.endswith(".json")})
+    wanted = [i for i in wanted if f"segmentation/{i}.png" in repo_files]
+    if not wanted:
+        return {}
+    from huggingface_hub import snapshot_download
+    local = Path(snapshot_download(DATASET_REPO, repo_type="dataset", revision=sha, token=HF_TOKEN,
+                                   allow_patterns=[f"segmentation/{i}.{e}" for i in wanted for e in ("png", "json")]))
+    (STIM_DIR / "seg").mkdir(parents=True, exist_ok=True)
+    segments = {}
+    for i in wanted:
+        info = json.loads((local / "segmentation" / f"{i}.json").read_text())
+        (STIM_DIR / "seg" / f"{i}.png").write_bytes((local / "segmentation" / f"{i}.png").read_bytes())
+        segments[i] = {seg["id"]: {"category": seg.get("category"), "names": seg.get("names"),
+                                   "isthing": seg.get("isthing")} for seg in info.get("segments_info", [])}
+    for st in stimuli:
+        if st["image_id"] in segments:
+            st["seg_file"] = f"seg/{st['image_id']}.png"
+    print(f"Segmentations for {len(segments)} images")
+    return segments
+
+
 STIMULI, DATASET_SHA, REPO_FILES = load_stimuli()
 BY_ID = {s["sample_id"]: s for s in STIMULI}
 # Labels for the saved files: every dataset column except the ones already sent or stored elsewhere.
@@ -217,7 +245,7 @@ LABEL_FIELDS = list(dict.fromkeys(k for s in STIMULI for k in s if k not in ("sa
 
 # Public fields sent to the browser. Taxonomy labels stay server-side so participants never see them;
 # visual_style is shown above the image so the drawing style is not mistaken for a mismatch.
-PUBLIC_FIELDS = ("sample_id", "prompt", "file_name", "visual_style")
+PUBLIC_FIELDS = ("sample_id", "prompt", "file_name", "visual_style", "seg_file")
 
 
 LIST_COUNT = int(os.environ.get("LIST_COUNT") or 0)   # number of lists; 0 = just enough to show every stimulus
@@ -347,6 +375,7 @@ def assign_rankings(sets, n_lists):
     return design_lists(ids, neighbours, n_lists, k) or [[] for _ in range(n_lists)]
 
 
+SEGMENTS = load_segments(DATASET_SHA, REPO_FILES, STIMULI)
 LISTS, CHECKS, NOT_IN_STUDY = build_lists(STIMULI)
 STUDY = [s for s in STIMULI if in_study(s)]
 EXPOSURE = Counter(i for l in LISTS for i in l)
@@ -441,6 +470,10 @@ async def submit(req: Request):
         if s:
             for k in LABEL_FIELDS:
                 t[k] = s.get(k)
+            # Selected segments (question 2 on segmented images): keep known ids, add their labels.
+            known = SEGMENTS.get(s["image_id"], {})
+            if t.get("segments"):
+                t["segments"] = [{"id": i, **known[i]} for i in t["segments"] if isinstance(i, int) and i in known]
     # Rankings: keep only known groups and their own images (image_id), in the order the participant
     # chose; the matching stimulus (sample_id, null for images rated only in the group) is added alongside.
     rankings = []
@@ -601,6 +634,7 @@ def summarize(sessions):
             "problem_rate": mean([t.get("problem", t.get("unwanted")) == "yes" for t in ts]),
             "median_rt_s": (median([t["rt"] for t in ts if t.get("rt")]) or 0) / 1000 or None,
             "marks": [[m["x"], m["y"]] for t in ts for m in t.get("marks", [])],
+            "segments": Counter(seg["category"] for t in ts for seg in t.get("segments") or []).most_common(),
         })
 
     by_cat = defaultdict(list)

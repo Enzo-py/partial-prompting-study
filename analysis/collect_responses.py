@@ -52,6 +52,8 @@ for f in sorted(local.glob("responses/list*/*.json")):
             "total_time_ms": s.get("total_time_ms"),
             **{k: (json.dumps(v) if isinstance(v, (list, dict)) else v) for k, v in t.items()},
             "n_marks": len(t.get("marks", [])),
+            # Question 2 on segmented images: the selected parts (`segments`, JSON) and their categories.
+            "segment_categories": ";".join(seg["category"] for seg in t.get("segments") or []) or None,
         })
 
 df = pd.DataFrame(rows)
