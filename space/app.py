@@ -27,8 +27,8 @@ Environment variables (set them as Space secrets / variables):
   STUDY_CONTACT             optional; researcher contact shown on the consent page
   PID_SALT                  optional secret; saves a salted hash of the Prolific ID (never the ID itself)
   LIST_COUNT, LIST_SIZE     optional; number of lists (default: just enough to show every stimulus) and
-                            study images per list (default 20, at most)
-  CHECKS_PER_LIST           optional; attention checks per list, rotating (default 4)
+                            study images per list (default 7, at most)
+  CHECKS_PER_LIST           optional; attention checks per list, rotating (default 3)
   RANKINGS_PER_LIST         optional; ranking questions after the ratings (default 5, 0 = none)
 """
 import hashlib
@@ -208,8 +208,8 @@ PUBLIC_FIELDS = ("sample_id", "prompt", "file_name", "visual_style")
 
 
 LIST_COUNT = int(os.environ.get("LIST_COUNT") or 0)   # number of lists; 0 = just enough to show every stimulus
-LIST_SIZE = int(os.environ.get("LIST_SIZE", 20))      # study images per list (an upper bound), checks not included
-CHECKS_PER_LIST = int(os.environ.get("CHECKS_PER_LIST", 4))  # attention checks per list, rotating
+LIST_SIZE = int(os.environ.get("LIST_SIZE", 7))      # study images per list (an upper bound), checks not included
+CHECKS_PER_LIST = int(os.environ.get("CHECKS_PER_LIST", 3))  # attention checks per list, rotating
 RANKINGS_PER_LIST = int(os.environ.get("RANKINGS_PER_LIST", 5))  # ranking questions after the ratings
 
 
@@ -585,7 +585,7 @@ def summarize(sessions):
             "attention_check": is_attention_check(st),
             "n": len(ts), "mean": mean(ratings),
             "dist": [ratings.count(r) for r in range(1, 6)],
-            "unwanted_rate": mean([t.get("unwanted") == "yes" for t in ts]),
+            "problem_rate": mean([t.get("problem", t.get("unwanted")) == "yes" for t in ts]),
             "median_rt_s": (median([t["rt"] for t in ts if t.get("rt")]) or 0) / 1000 or None,
             "marks": [[m["x"], m["y"]] for t in ts for m in t.get("marks", [])],
         })
@@ -595,7 +595,7 @@ def summarize(sessions):
         if not is_attention_check(st):
             by_cat[(st.get("category"), st.get("category_name"))] += trials[st["sample_id"]]
     categories = [{"category": c, "name": name, "n": len(ts), "mean": mean([t["rating"] for t in ts]),
-                   "unwanted_rate": mean([t.get("unwanted") == "yes" for t in ts])}
+                   "problem_rate": mean([t.get("problem", t.get("unwanted")) == "yes" for t in ts])}
                   for (c, name), ts in sorted(by_cat.items(), key=lambda kv: str(kv[0][0]))]
 
     by_pair = defaultdict(list)

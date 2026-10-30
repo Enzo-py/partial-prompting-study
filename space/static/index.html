@@ -164,7 +164,7 @@ class StimulusPlugin {
   constructor(jsPsych) { this.jsPsych = jsPsych; }
   trial(el, t) {
     const s = t.stim, t0 = performance.now();
-    const r = { rating: null, unwanted: null, marks: [], rating_changes: 0, rt_first_rating: null };
+    const r = { rating: null, problem: null, marks: [], rating_changes: 0, rt_first_rating: null };
     el.innerHTML = `
       ${progress(t.practice ? { on: 1, note: "Practice · this one is not used, it is only to try the questions" }
                             : { on: 1, rate: t.index / t.total, note: `Image ${t.index + 1} of ${t.total}` })}
@@ -174,33 +174,33 @@ class StimulusPlugin {
         <div class="stim" id="stim"><img src="${s.src || src(s.file_name)}" alt="" draggable="false"></div>
         <div class="q"><h3>1. How well does the image match the text?</h3>
           <div class="likert" role="radiogroup">${radios("rating", [[1,"Does not match"],[2,"Poorly"],[3,"Partly"],[4,"Mostly"],[5,"Fully matches"]], (v, l) => `<b>${v}</b>${l}`)}</div></div>
-        <div class="q"><h3>2. Is there anything in the image that should <em>not</em> be there, given the text?</h3>
-          <div class="row" role="radiogroup">${radios("unwanted", [["no","No"],["yes","Yes"]], (v, l) => l)}</div>
+        <div class="q"><h3>2. Is any part of the image a problem, or does not match the text?</h3>
+          <div class="row" role="radiogroup">${radios("problem", [["no","No"],["yes","Yes"]], (v, l) => l)}</div>
           <div class="marks" id="marks" hidden></div></div>
         <div class="nav"><button class="b primary" id="next" disabled>${t.practice ? "Start the study" : t.last ? "Submit my answers" : "Next"}</button></div>
       </div>`;
     window.scrollTo({ top: 0 });
     const stim = el.querySelector("#stim"), marksEl = el.querySelector("#marks"), next = el.querySelector("#next");
     const refresh = () => {
-      const marking = r.unwanted === "yes";
+      const marking = r.problem === "yes";
       stim.classList.toggle("marking", marking);
       stim.querySelectorAll(".mk,.hint").forEach(n => n.remove());
       r.marks.forEach(m => { const d = document.createElement("div"); d.className = "mk"; d.style.left = (m.x * 100) + "%"; d.style.top = (m.y * 100) + "%"; stim.appendChild(d); });
       if (marking) {
-        const h = document.createElement("span"); h.className = "hint"; h.textContent = matchMedia("(pointer: coarse)").matches ? "Tap what shouldn't be there" : "Click on what shouldn't be there"; stim.appendChild(h);
+        const h = document.createElement("span"); h.className = "hint"; h.textContent = (matchMedia("(pointer: coarse)").matches ? "Tap" : "Click") + " each area that is a problem"; stim.appendChild(h);
         marksEl.hidden = false;
-        marksEl.innerHTML = r.marks.length ? `<span>${r.marks.length} element${r.marks.length === 1 ? "" : "s"} marked</span><button class="link" id="clr">Clear</button>`
-                                           : `<span>Mark at least one element on the image.</span>`;
+        marksEl.innerHTML = r.marks.length ? `<span>${r.marks.length} area${r.marks.length === 1 ? "" : "s"} marked</span><button class="link" id="clr">Clear</button>`
+                                           : `<span>Mark at least one area on the image.</span>`;
         const c = marksEl.querySelector("#clr"); if (c) c.onclick = () => { r.marks = []; refresh(); };
       } else marksEl.hidden = true;
-      next.disabled = !(r.rating && r.unwanted) || (r.unwanted === "yes" && !r.marks.length);
+      next.disabled = !(r.rating && r.problem) || (r.problem === "yes" && !r.marks.length);
     };
     el.querySelectorAll('input[name="rating"]').forEach(i => i.onchange = () => {
       if (r.rating !== null) r.rating_changes++; else r.rt_first_rating = Math.round(performance.now() - t0);
       r.rating = +i.value; refresh(); });
-    el.querySelectorAll('input[name="unwanted"]').forEach(i => i.onchange = () => { r.unwanted = i.value; if (i.value === "no") r.marks = []; refresh(); });
+    el.querySelectorAll('input[name="problem"]').forEach(i => i.onchange = () => { r.problem = i.value; if (i.value === "no") r.marks = []; refresh(); });
     stim.addEventListener("click", ev => {
-      if (r.unwanted !== "yes") return;
+      if (r.problem !== "yes") return;
       const b = stim.querySelector("img").getBoundingClientRect();
       const x = (ev.clientX - b.left) / b.width, y = (ev.clientY - b.top) / b.height;
       if (x < 0 || x > 1 || y < 0 || y > 1) return;
@@ -208,7 +208,7 @@ class StimulusPlugin {
     });
     next.onclick = () => {
       const data = { trial_kind: t.practice ? "practice" : "stimulus", position: t.index + 1, sample_id: s.sample_id, prompt: s.prompt,
-        rating: r.rating, unwanted: r.unwanted, marks: r.marks,
+        rating: r.rating, problem: r.problem, marks: r.marks,
         rating_changes: r.rating_changes,
         rt_first_rating: r.rt_first_rating, rt: Math.round(performance.now() - t0) };
       el.innerHTML = ""; this.jsPsych.finishTrial(data);
@@ -362,7 +362,7 @@ async function main() {
   addEventListener("beforeunload", leaveGuard);
   const timeline = [
     { type: PagePlugin, button: "I agree, continue", html: `
-      <div class="prompt"><span class="lbl">Research study · about ${Math.max(3, Math.round(stims.length * 0.4 + rankings.length * 0.5))} minutes</span><q>Does the image match the text?</q></div>
+      <div class="prompt"><span class="lbl">Research study · about ${Math.max(3, Math.round(1.5 + stims.length * 0.4 + rankings.length * 0.5))} minutes</span><q>Does the image match the text?</q></div>
       <p>This study is part of academic research on how people judge images made by AI image generators. It has ${rankings.length ? "two parts" : "one part"}:</p>
       <ol>
         <li><b>Rate images</b>: you will see ${stims.length} short texts, each with an image, and answer two quick questions about each.</li>
@@ -379,12 +379,15 @@ async function main() {
     { type: PagePlugin, button: "Begin", html: `
       <div class="prompt"><span class="lbl">Instructions</span><q>How to answer</q></div>
       <div class="notice" role="note">
-        <p><b>Please note.</b> You rate how well each image matches its text, as if you had typed the text into an image generator and got this image back.</p>
+        <p><b>Please note.</b> Imagine you typed each text into an image generator and got this image back. You judge how well the image matches what the text asks for, not how beautiful or realistic it is.</p>
         <p><mark>This is your own judgement: there are no right or wrong answers.</mark></p>
       </div>
+      <p>For each image, you answer two questions:</p>
+      <ol>
+        <li><b>How well does the image match the text?</b> Choose a score from 1 (does not match) to 5 (fully matches).</li>
+        <li><b>Is any part of the image a problem, or does not match the text?</b> If yes, click (or tap) on each of these areas in the image to mark them. If not, answer <b>No</b>.</li>
+      </ol>
       <ul>
-        <li>Judge only <b>how well the image matches what the text asks for</b>, not how beautiful or realistic it is.</li>
-        <li>Question 2: if the image shows something that does not belong there given the text, answer <b>Yes</b>, then click (or tap) on that thing in the image to mark it. Otherwise answer <b>No</b>.</li>
         <li>Positions such as <b>left</b>, <b>right</b>, <b>above</b> or <b>below</b> are meant from your point of view as you look at the image, not from the point of view of someone or something in it.</li>
         <li>Go with your first impression.</li>
       </ul>

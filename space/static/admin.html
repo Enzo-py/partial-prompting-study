@@ -182,10 +182,10 @@ function render() {
     <h2>By category</h2>
     <p class="sub">Attention check left out. Rating from 1 (does not match) to 5 (matches). Excluded sessions are left out of every statistic below.</p>
     <div class="tw"><table>
-      <thead><tr><th>Category</th><th class="num">Ratings</th><th class="num">Mean rating</th><th class="num">“Should not be there”</th></tr></thead>
+      <thead><tr><th>Category</th><th class="num">Ratings</th><th class="num">Mean rating</th><th class="num">“Problem” marked</th></tr></thead>
       <tbody>${d.categories.map(c => `<tr>
         <td><span class="tag">${esc(c.category)}</span> ${esc(c.name)}</td>
-        <td class="num">${c.n}</td><td class="num">${meanbar(c.mean)}</td><td class="num">${pct(c.unwanted_rate)}</td></tr>`).join("")}</tbody>
+        <td class="num">${c.n}</td><td class="num">${meanbar(c.mean)}</td><td class="num">${pct(c.problem_rate)}</td></tr>`).join("")}</tbody>
     </table></div>
   </section>
 
@@ -242,7 +242,7 @@ function meanbar(m) {
 
 const COLS = [
   ["sample_id", "ID"], ["prompt", "Prompt"], ["case_id", "Case"],
-  ["n", "n", 1], ["mean", "Mean rating", 1], ["dist", "Ratings 1–5"], ["unwanted_rate", "Not there", 1],
+  ["n", "n", 1], ["mean", "Mean rating", 1], ["dist", "Ratings 1–5"], ["problem_rate", "Problem", 1],
   ["median_rt_s", "Median RT", 1],
 ];
 
@@ -264,13 +264,13 @@ function renderStimuli() {
       <td class="num">${s.n}</td>
       <td class="num">${meanbar(s.mean)}</td>
       <td><span class="hist" title="${s.dist.map((c, i) => `${i + 1}: ${c}`).join(" · ")}">${s.dist.map(c => `<i class="${c ? "" : "zero"}" style="height:${c ? Math.max(3, c / peak * 26) : 1}px"></i>`).join("")}</span></td>
-      <td class="num">${pct(s.unwanted_rate)}</td>
+      <td class="num">${pct(s.problem_rate)}</td>
       <td class="num">${s.median_rt_s == null ? "–" : fmt(s.median_rt_s, 1) + " s"}</td>
     </tr>${open.has(s.sample_id) ? detail(s) : ""}`;
   }).join("")}</tbody>`;
   tbl.querySelectorAll("th.sortable").forEach(th => th.onclick = () => {
     const k = th.dataset.k;
-    sort = {col: k, dir: sort.col === k ? -sort.dir : (["n", "mean", "unwanted_rate", "median_rt_s"].includes(k) ? -1 : 1)};
+    sort = {col: k, dir: sort.col === k ? -sort.dir : (["n", "mean", "problem_rate", "median_rt_s"].includes(k) ? -1 : 1)};
     renderStimuli();
   });
   tbl.querySelectorAll("tr.stim").forEach(tr => {
