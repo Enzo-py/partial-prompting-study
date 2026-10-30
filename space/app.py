@@ -109,6 +109,23 @@ def _imagefolder_rows(local, files):
             yield r, path.read_bytes(), path.name
 
 
+WEB_MAX_SIDE = 1024  # images are never shown larger than this
+
+
+def web_image(data, path):
+    """Write `data` to STIM_DIR/<path>.webp, resized to WEB_MAX_SIDE and compressed (a 2 MB PNG becomes
+    ~150 KB), and return that name. Click marks are stored relative to the image, so resizing keeps them valid."""
+    import io
+    from PIL import Image
+    name = f"{path}.webp"
+    with Image.open(io.BytesIO(data)) as im:
+        im = im.convert("RGBA" if im.mode in ("RGBA", "LA", "P") else "RGB")
+        im.thumbnail((WEB_MAX_SIDE, WEB_MAX_SIDE), Image.LANCZOS)
+        (STIM_DIR / name).parent.mkdir(parents=True, exist_ok=True)
+        im.save(STIM_DIR / name, "WEBP", quality=85, method=4)
+    return name
+
+
 def load_stimuli():
     """Download the stimuli, write the images to STIM_DIR, return (rows, commit sha).
 
@@ -143,10 +160,7 @@ def load_stimuli():
         for col in ("sample_id", "prompt"):
             if r.get(col) is None:
                 raise RuntimeError(f"Row without '{col}' in {', '.join(files)}")
-        ext = Path(src).suffix.lower() or (".jpg" if data[:2] == b"\xff\xd8" else ".png")
-        name = f"{r['sample_id']}{ext}"
-        (STIM_DIR / name).write_bytes(data)
-        r["file_name"] = name
+        r["file_name"] = web_image(data, r["sample_id"])
         r["role"] = r.get("role") or "test"
         r["pair_ids"] = list(r.get("pair_ids") or [])
         r["image_id"] = r.get("image_id") or r["sample_id"]
@@ -183,8 +197,7 @@ def load_groups(sha, repo_files):
             src = local / "data" / m["file_name"]
             if not src.is_file():
                 raise RuntimeError(f"{GROUPS_FILE}, line {n}: image data/{m['file_name']} not found")
-            name = f"groups/{m['image_id']}{src.suffix.lower()}"
-            (STIM_DIR / name).write_bytes(src.read_bytes())
+            name = web_image(src.read_bytes(), f"groups/{m['image_id']}")
             images[m["image_id"]] = {"image_id": m["image_id"], "sample_id": m.get("sample_id"), "file_name": name}
         if len(images) < 2:
             print(f"Skipping group {g.get('group_id')}: {len(images)} image(s), nothing to rank")

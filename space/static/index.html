@@ -120,6 +120,25 @@ const progress = ({ rate = 0, rank = 0, on = 0, note = "" } = {}) => `
     <div class="step${on === 1 ? " on" : ""}"><span>1 · Rate images</span><span class="bar"><i style="width:${100 * rate}%"></i></span></div>
     ${STEPS.rank ? `<div class="step${on === 2 ? " on" : ""}"><span>2 · Rank images</span><span class="bar"><i style="width:${100 * rank}%"></i></span></div>` : ""}
   </div><span class="eyebrow">${note}</span>`;
+// Image loading: each step's images start loading on the text page before it; a trial whose images
+// are not there yet shows a loading screen until they are.
+const imageURL = im => im.src || src(im.file_name);
+const LOADS = new Map(), LOADED = new Set();
+const load = url => {
+  if (!LOADS.has(url)) LOADS.set(url, new Promise(ok => {
+    const i = new Image(); i.onload = i.onerror = () => { LOADED.add(url); ok(); }; i.src = url; }));
+  return LOADS.get(url);
+};
+const preload = urls => urls.forEach(load);
+async function whenLoaded(el, urls, prog) {
+  if (urls.every(u => LOADED.has(u))) return;
+  const draw = () => { el.innerHTML = `${progress(prog)}<div class="card loading" role="status">
+    <div class="prompt"><span class="lbl">Loading</span><q>Loading the images…</q></div>
+    <p class="muted">${urls.filter(u => LOADED.has(u)).length} of ${urls.length} ready. This only takes a moment.</p></div>`; };
+  draw();
+  await Promise.all(urls.map(u => load(u).then(draw)));
+  el.innerHTML = "";
+}
 const radios = (name, opts, fmt) => opts.map(([v, l]) => `
   <div class="opt"><input type="radio" id="${name}-${v}" name="${name}" value="${v}"><label for="${name}-${v}">${fmt(v, l)}</label></div>`).join("");
 
@@ -163,15 +182,21 @@ class StimulusPlugin {
     practice: { type: PT.BOOL, default: false }, last: { type: PT.BOOL, default: false } } };
   constructor(jsPsych) { this.jsPsych = jsPsych; }
   trial(el, t) {
+    return whenLoaded(el, [imageURL(t.stim)], this.prog(t)).then(() => this.show(el, t));
+  }
+  prog(t) {
+    return t.practice ? { on: 1, note: "Practice · this one is not used, it is only to try the questions" }
+                      : { on: 1, rate: t.index / t.total, note: `Image ${t.index + 1} of ${t.total}` };
+  }
+  show(el, t) {
     const s = t.stim, t0 = performance.now();
     const r = { rating: null, problem: null, marks: [], rating_changes: 0, rt_first_rating: null };
     el.innerHTML = `
-      ${progress(t.practice ? { on: 1, note: "Practice · this one is not used, it is only to try the questions" }
-                            : { on: 1, rate: t.index / t.total, note: `Image ${t.index + 1} of ${t.total}` })}
+      ${progress(this.prog(t))}
       <div class="card">
         <div class="prompt"><span class="lbl">Text</span><q class="text">${esc(s.prompt)}</q></div>
         ${s.visual_style ? `<div class="style"><span class="tag">${esc(styleLabel(s.visual_style))}</span>Judge what is shown, not the drawing style.</div>` : ""}
-        <div class="stim" id="stim"><img src="${s.src || src(s.file_name)}" alt="" draggable="false"></div>
+        <div class="stim" id="stim"><img src="${imageURL(s)}" alt="" draggable="false"></div>
         <div class="q"><h3>1. How well does the image match the text?</h3>
           <div class="likert" role="radiogroup">${radios("rating", [[1,"Does not match"],[2,"Poorly"],[3,"Partly"],[4,"Mostly"],[5,"Fully matches"]], (v, l) => `<b>${v}</b>${l}`)}</div></div>
         <div class="q"><h3>2. Is any part of the image a problem, or does not match the text?</h3>
@@ -224,17 +249,23 @@ class RankingPlugin {
     practice: { type: PT.BOOL, default: false }, last: { type: PT.BOOL, default: false } } };
   constructor(jsPsych) { this.jsPsych = jsPsych; }
   trial(el, t) {
+    return whenLoaded(el, t.set.images.map(imageURL), this.prog(t)).then(() => this.show(el, t));
+  }
+  prog(t) {
+    return t.practice ? { on: 2, rate: 1, note: "Practice · this one is not used, it is only to try the ranking" }
+                      : { on: 2, rate: 1, rank: t.index / t.total, note: `Ranking ${t.index + 1} of ${t.total}` };
+  }
+  show(el, t) {
     const r = t.set, t0 = performance.now();
     const shown = this.jsPsych.randomization.shuffle(r.images);
     let order = [], resets = 0;
     el.innerHTML = `
-      ${progress(t.practice ? { on: 2, rate: 1, note: "Practice · this one is not used, it is only to try the ranking" }
-                            : { on: 2, rate: 1, rank: t.index / t.total, note: `Ranking ${t.index + 1} of ${t.total}` })}
+      ${progress(this.prog(t))}
       <div class="card">
         <div class="prompt"><span class="lbl">Text</span><q class="text">${esc(r.prompt)}</q></div>
         ${r.visual_style ? `<div class="style"><span class="tag">${esc(styleLabel(r.visual_style))}</span>Judge what is shown, not the drawing style.</div>` : ""}
         <p>Which of these would you rather get from an image generator for this text? Tap them from your favourite to your least favourite.</p>
-        <div class="rank" style="--cols:${shown.length === 4 ? 2 : Math.min(shown.length, 3)}">${shown.map(im => `<button type="button" class="rk" data-id="${esc(im.image_id)}"><img src="${im.src || src(im.file_name)}" alt="" draggable="false"><span class="badge" hidden></span></button>`).join("")}</div>
+        <div class="rank" style="--cols:${shown.length === 4 ? 2 : Math.min(shown.length, 3)}">${shown.map(im => `<button type="button" class="rk" data-id="${esc(im.image_id)}"><img src="${imageURL(im)}" alt="" draggable="false"><span class="badge" hidden></span></button>`).join("")}</div>
         <div class="marks" id="status"></div>
         <div class="nav"><button class="b" id="reset">Start over</button><button class="b primary" id="next" disabled>${t.practice ? "Start the ranking" : t.last ? "Submit my answers" : "Next"}</button></div>
       </div>`;
@@ -352,16 +383,19 @@ async function main() {
     target.innerHTML = `<div class="jspsych-content-wrapper"><div class="jspsych-content"><div class="card"><div class="prompt"><span class="lbl">Error</span><q>The study could not start</q></div><p class="err">Reload the page in a minute. If it still fails, contact the researchers.</p></div></div></div>`;
     return;
   }
-  // preload every image before the first trial
   const rankings = jsPsych.randomization.shuffle(SESSION.rankings || []);
   STEPS.rank = rankings.length > 0;
-  const files = [...SESSION.stimuli, ...rankings.flatMap(r => r.images)].map(s => s.file_name);
-  await Promise.all([...new Set(files)].map(f => new Promise(ok => { const i = new Image(); i.onload = i.onerror = ok; i.src = src(f); })));
-
   const stims = jsPsych.randomization.shuffle(SESSION.stimuli);
+  const practiceStim = { sample_id: "practice", prompt: "A butterfly on a flower", src: "/static/practice/butterfly.jpg", visual_style: "photo" };
+  const practiceSet = { set_id: "practice", prompt: "A butterfly on a flower", visual_style: "photo",
+    images: ["butterfly", "macaw", "bluebird"].map(n => ({ image_id: n, src: `/static/practice/${n}.jpg` })) };
+  // Step 1 images load while the participant reads the consent and instructions, step 2 images on
+  // the ranking instructions, in the order they will be shown.
+  const rateImages = [practiceStim, ...stims].map(imageURL);
+  const rankImages = [practiceSet, ...rankings].flatMap(r => r.images.map(imageURL));
   addEventListener("beforeunload", leaveGuard);
   const timeline = [
-    { type: PagePlugin, button: "I agree, continue", html: `
+    { type: PagePlugin, button: "I agree, continue", on_start: () => preload(rateImages), html: `
       <div class="prompt"><span class="lbl">Research study · about ${Math.max(3, Math.round(1.5 + stims.length * 0.4 + rankings.length * 0.5))} minutes</span><q>Does the image match the text?</q></div>
       <p>This study is part of academic research on how people judge images made by AI image generators. It has ${rankings.length ? "two parts" : "one part"}:</p>
       <ol>
@@ -392,9 +426,9 @@ async function main() {
         <li>Go with your first impression.</li>
       </ul>
       <p class="muted">The first image is a practice round.</p>`, progress: { on: 1, note: "Instructions" } },
-    { type: StimulusPlugin, practice: true, stim: { sample_id: "practice", prompt: "A butterfly on a flower", src: "/static/practice/butterfly.jpg", visual_style: "photo" } },
+    { type: StimulusPlugin, practice: true, stim: practiceStim },
     ...stims.map((s, i) => ({ type: StimulusPlugin, stim: s, index: i, total: stims.length, last: !rankings.length && i === stims.length - 1 })),
-    ...(rankings.length ? [{ type: PagePlugin, button: "Start", progress: { on: 2, rate: 1, note: "Instructions" }, html: `
+    ...(rankings.length ? [{ type: PagePlugin, button: "Start", progress: { on: 2, rate: 1, note: "Instructions" }, on_start: () => preload(rankImages), html: `
       <div class="prompt"><span class="lbl">Last part</span><q>Which image would you prefer?</q></div>
       <div class="notice" role="note">
         <p><b>Please note.</b> You rank the images by which one you would rather get from an image generator for this text: how well each one matches what the text asks for.</p>
@@ -407,8 +441,7 @@ async function main() {
         <li>Go with your own preference.</li>
       </ul>
       <p class="muted">The first ranking is a practice round.</p>` },
-      { type: RankingPlugin, practice: true, set: { set_id: "practice", prompt: "A butterfly on a flower", visual_style: "photo",
-        images: ["butterfly", "macaw", "bluebird"].map(n => ({ image_id: n, src: `/static/practice/${n}.jpg` })) } }] : []),
+      { type: RankingPlugin, practice: true, set: practiceSet }] : []),
     ...rankings.map((r, i) => ({ type: RankingPlugin, set: r, index: i, total: rankings.length, last: i === rankings.length - 1 })),
   ];
   await jsPsych.run(timeline);
