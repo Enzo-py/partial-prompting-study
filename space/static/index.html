@@ -137,12 +137,17 @@ const stimURLs = s => [imageURL(s), ...(s.seg_file ? [src(s.seg_file)] : [])];
 const SEGMAPS = new Map();
 function segmentMap(url) {
   if (SEGMAPS.has(url)) return SEGMAPS.get(url);
-  const img = IMAGES.get(url), w = img.naturalWidth, h = img.naturalHeight;
-  if (!w) return null;
-  const c = document.createElement("canvas"); c.width = w; c.height = h;
-  const ctx = c.getContext("2d", { willReadFrequently: true }); ctx.drawImage(img, 0, 0);
-  const px = ctx.getImageData(0, 0, w, h).data, ids = new Uint32Array(w * h);
-  for (let k = 0; k < ids.length; k++) ids[k] = px[4 * k] + 256 * px[4 * k + 1] + 65536 * px[4 * k + 2];
+  // A map that did not load, cannot be read or has no part to select gives null: points instead.
+  const img = IMAGES.get(url), w = img ? img.naturalWidth : 0, h = img ? img.naturalHeight : 0;
+  if (!w || !h) return null;
+  let ids;
+  try {
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const ctx = c.getContext("2d", { willReadFrequently: true }); ctx.drawImage(img, 0, 0);
+    const px = ctx.getImageData(0, 0, w, h).data; ids = new Uint32Array(w * h);
+    for (let k = 0; k < ids.length; k++) ids[k] = px[4 * k] + 256 * px[4 * k + 1] + 65536 * px[4 * k + 2];
+  } catch (e) { return null; }
+  if (!ids.some(id => id)) return null;
   const map = {
     w, h,
     idAt: (x, y) => ids[Math.min(h - 1, Math.floor(y * h)) * w + Math.min(w - 1, Math.floor(x * w))],
@@ -214,7 +219,7 @@ class ProfilePlugin {
   }
 }
 
-// Question 2 marks what does not fit: on images with a segmentation (`seg_file`, COCO panoptic: segment
+// Question 2 marks what doesn't match: on images with a segmentation (`seg_file`, COCO panoptic: segment
 // id = R + 256·G + 256²·B) a click selects or unselects the whole segment under it; on other images
 // it places a point.
 class StimulusPlugin {
@@ -241,7 +246,7 @@ class StimulusPlugin {
         <div class="stim" id="stim"><img src="${imageURL(s)}" alt="" draggable="false">${seg ? `<canvas class="seg" width="${seg.w}" height="${seg.h}"></canvas>` : ""}</div>
         <div class="q"><h3>1. How well does the image match the text?</h3>
           <div class="likert" role="radiogroup">${radios("rating", [[1,"Does not match"],[2,"Poorly"],[3,"Partly"],[4,"Mostly"],[5,"Fully matches"]], (v, l) => `<b>${v}</b>${l}`)}</div></div>
-        <div class="q"><h3>2. Does any part of the image not fit the text?</h3>
+        <div class="q"><h3>2. Is there anything in the image that doesn’t match the text?</h3>
           <div class="row" role="radiogroup">${radios("problem", [["no","No"],["yes","Yes"]], (v, l) => l)}</div>
           <div class="marks" id="marks" hidden></div></div>
         <div class="nav"><button class="b primary" id="next" disabled>${t.practice ? "Start the study" : t.last ? "Submit my answers" : "Next"}</button></div>
@@ -259,7 +264,7 @@ class StimulusPlugin {
       if (seg) seg.draw(canvas, r.segments, marking ? hover : 0);
       else r.marks.forEach(m => { const d = document.createElement("div"); d.className = "mk"; d.style.left = (m.x * 100) + "%"; d.style.top = (m.y * 100) + "%"; stim.appendChild(d); });
       if (marking) {
-        const h = document.createElement("span"); h.className = "hint"; h.textContent = `${tap} each part that does not fit`; stim.appendChild(h);
+        const h = document.createElement("span"); h.className = "hint"; h.textContent = `${tap} each part that doesn’t match`; stim.appendChild(h);
         marksEl.hidden = false;
         const n = count(), what = seg ? "part" : "area";
         marksEl.innerHTML = n ? `<span>${n} ${what}${n === 1 ? "" : "s"} selected${seg ? ` · ${tap.toLowerCase()} a part again to unselect it` : ""}</span><button class="link" id="clr">Clear</button>`
@@ -484,7 +489,7 @@ async function main() {
       <p>For each image, you answer two questions:</p>
       <ol>
         <li><b>How well does the image match the text?</b> Choose a score from 1 (does not match) to 5 (fully matches).</li>
-        <li><b>Does any part of the image not fit the text?</b> If yes, click (or tap) on each part that does not fit to select it; on most images the whole object or region is selected at once. If not, answer <b>No</b>.</li>
+        <li><b>Is there anything in the image that doesn’t match the text?</b> If yes, click (or tap) on each part that doesn’t match to select it; on most images the whole object or region is selected at once. If not, answer <b>No</b>.</li>
       </ol>
       <ul>
         <li>Positions such as <b>left</b>, <b>right</b>, <b>above</b> or <b>below</b> are meant from your point of view as you look at the image, not from the point of view of someone or something in it.</li>

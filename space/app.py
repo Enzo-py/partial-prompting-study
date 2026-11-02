@@ -214,7 +214,8 @@ def load_segments(sha, repo_files, stimuli):
     """Segmentations from the dataset (`segmentation/<image_id>.png` + `.json`, COCO panoptic). For each
     stimulus whose image has one, the map is copied to STIM_DIR/seg/<image_id>.png (`seg_file`) so that
     question 2 can let participants pick segments instead of clicking points. The category names stay
-    server-side; returns {image_id: {segment id: {category, names, isthing}}}."""
+    server-side; returns {image_id: {segment id: {category, names, isthing}}}. Images without a usable
+    segmentation (missing, unreadable or empty) keep point marking; a failure never stops the app."""
     wanted = sorted({s["image_id"] for s in stimuli if in_study(s)}
                     & {f[len("segmentation/"):-5] for f in repo_files
                        if f.startswith("segmentation/") and f.endswith(".json")})
@@ -222,15 +223,30 @@ def load_segments(sha, repo_files, stimuli):
     if not wanted:
         return {}
     from huggingface_hub import snapshot_download
-    local = Path(snapshot_download(DATASET_REPO, repo_type="dataset", revision=sha, token=HF_TOKEN,
-                                   allow_patterns=[f"segmentation/{i}.{e}" for i in wanted for e in ("png", "json")]))
+    from PIL import Image
+    try:
+        local = Path(snapshot_download(DATASET_REPO, repo_type="dataset", revision=sha, token=HF_TOKEN,
+                                       allow_patterns=[f"segmentation/{i}.{e}" for i in wanted for e in ("png", "json")]))
+    except Exception as e:
+        print(f"Segmentations not loaded, point marking everywhere: {e}")
+        return {}
     (STIM_DIR / "seg").mkdir(parents=True, exist_ok=True)
     segments = {}
     for i in wanted:
-        info = json.loads((local / "segmentation" / f"{i}.json").read_text())
-        (STIM_DIR / "seg" / f"{i}.png").write_bytes((local / "segmentation" / f"{i}.png").read_bytes())
-        segments[i] = {seg["id"]: {"category": seg.get("category"), "names": seg.get("names"),
-                                   "isthing": seg.get("isthing")} for seg in info.get("segments_info", [])}
+        try:
+            info = json.loads((local / "segmentation" / f"{i}.json").read_text())
+            known = {seg["id"]: {"category": seg.get("category"), "names": seg.get("names"),
+                                 "isthing": seg.get("isthing")}
+                     for seg in info.get("segments_info") or [] if isinstance(seg.get("id"), int) and seg["id"]}
+            with Image.open(local / "segmentation" / f"{i}.png") as im:
+                im.verify()
+            if not known:
+                raise ValueError("no segments")
+            (STIM_DIR / "seg" / f"{i}.png").write_bytes((local / "segmentation" / f"{i}.png").read_bytes())
+        except Exception as e:
+            print(f"Segmentation of {i} skipped, point marking instead: {e}")
+            continue
+        segments[i] = known
     for st in stimuli:
         if st["image_id"] in segments:
             st["seg_file"] = f"seg/{st['image_id']}.png"
