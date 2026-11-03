@@ -48,6 +48,19 @@ section > .sub{margin:0 0 14px;color:var(--muted);font-size:13px}
 .track i{display:block;height:100%;background:var(--accent);border-radius:0 4px 4px 0}
 .track i.pend{background:var(--accent-soft);border-radius:0 4px 4px 0}
 .lrow .n{font-size:12.5px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.lists details>summary{list-style:none;cursor:pointer;border-radius:4px}
+.lists details>summary::-webkit-details-marker{display:none}
+.lists details>summary:hover{background:var(--hover)}
+.lists details[open]>summary .mono{font-weight:600}
+.lcontent{display:flex;flex-direction:column;gap:12px;padding:10px 0 16px 68px}
+.lcontent h3{font-size:12px;font-weight:500;color:var(--muted);margin:0}
+.lstims{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
+.lstims figure,.lrank figure{margin:0;display:flex;flex-direction:column;gap:4px;font-size:11.5px}
+.lstims img,.lrank img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;background:var(--hover)}
+.lstims figure.check img{outline:2px solid var(--warn);outline-offset:-2px}
+.lrank{display:flex;flex-direction:column;gap:6px}
+.lrank .imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,110px));gap:8px}
+@media (max-width:600px){.lcontent{padding-left:0}}
 /* tables */
 .tw{overflow-x:auto;margin:0 -4px}
 table{border-collapse:collapse;width:100%;font-size:13px}
@@ -168,13 +181,23 @@ function render() {
 
   <section class="card">
     <h2>Progress per list</h2>
-    <p class="sub">${d.lists.length} counterbalanced lists. New participants get the least-filled list. ${t.completed ? `Gap between the fullest and emptiest list: ${spread}.` : ""}</p>
-    <div class="lists">${d.lists.map(l => `
-      <div class="lrow" title="List ${l.list_id}: ${l.completed} completed, ${l.in_progress} in progress, ${l.items} items">
+    <p class="sub">${d.lists.length} counterbalanced lists. New participants get the least-filled list. Click a list to see its images and rankings. ${t.completed ? `Gap between the fullest and emptiest list: ${spread}.` : ""}</p>
+    <div class="lists">${d.lists.map(l => `<details>
+      <summary class="lrow" title="List ${l.list_id}: ${l.completed} completed, ${l.in_progress} in progress, ${l.items} items. Click to see its images and rankings.">
         <span class="mono">List ${l.list_id}</span>
         <div class="track">${l.completed ? `<i style="width:${l.completed / maxList * 100}%"></i>` : ""}${l.in_progress ? `<i class="pend" style="width:${l.in_progress / maxList * 100}%"></i>` : ""}</div>
         <span class="n">${l.completed} done${l.in_progress ? ` · ${l.in_progress} live` : ""}</span>
-      </div>`).join("")}
+      </summary>
+      <div class="lcontent">
+        <h3>${l.stimuli.length} images to rate${l.stimuli.some(s => s.check) ? ` · attention checks outlined` : ""}</h3>
+        <div class="lstims">${l.stimuli.map(s => `<figure class="${s.check ? "check" : ""}" title="${esc(s.prompt)}">
+          <img src="/stimuli/${s.file_name.split("/").map(encodeURIComponent).join("/")}" alt="" loading="lazy">
+          <figcaption><span class="mono">${esc(s.sample_id)}</span>${s.check ? ` <span class="tag">check</span>` : ""}<br>${esc(s.prompt)}</figcaption></figure>`).join("")}</div>
+        ${l.rankings.length ? `<h3>${l.rankings.length} rankings</h3>${l.rankings.map(r => `<div class="lrank">
+          <span><span class="prompt">${esc(r.prompt)}</span> <span class="mono muted">${esc(r.set_id)}</span></span>
+          <div class="imgs">${r.images.map(f => `<figure><img src="/stimuli/${f.split("/").map(encodeURIComponent).join("/")}" alt="" loading="lazy"></figure>`).join("")}</div>
+        </div>`).join("")}` : ""}
+      </div></details>`).join("")}
     </div>
   </section>
 

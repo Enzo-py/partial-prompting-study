@@ -27,8 +27,8 @@ Environment variables (set them as Space secrets / variables):
   STUDY_CONTACT             optional; researcher contact shown on the consent page
   PID_SALT                  optional secret; saves a salted hash of the Prolific ID (never the ID itself)
   LIST_COUNT, LIST_SIZE     optional; number of lists (default: just enough to show every stimulus) and
-                            study images per list (default 13, at most)
-  CHECKS_PER_LIST           optional; attention checks per list, rotating (default 3)
+                            study images per list (default 14, at most)
+  CHECKS_PER_LIST           optional; attention checks per list, rotating (default 2)
   RANKINGS_PER_LIST         optional; ranking questions after the ratings (default 5, 0 = none)
 """
 import hashlib
@@ -265,8 +265,8 @@ PUBLIC_FIELDS = ("sample_id", "prompt", "file_name", "visual_style", "seg_file")
 
 
 LIST_COUNT = int(os.environ.get("LIST_COUNT") or 0)   # number of lists; 0 = just enough to show every stimulus
-LIST_SIZE = int(os.environ.get("LIST_SIZE", 13))     # study images per list (an upper bound), checks not included
-CHECKS_PER_LIST = int(os.environ.get("CHECKS_PER_LIST", 3))  # attention checks per list, rotating
+LIST_SIZE = int(os.environ.get("LIST_SIZE", 14))     # study images per list (an upper bound), checks not included
+CHECKS_PER_LIST = int(os.environ.get("CHECKS_PER_LIST", 2))  # attention checks per list, rotating
 RANKINGS_PER_LIST = int(os.environ.get("RANKINGS_PER_LIST", 5))  # ranking questions after the ratings
 
 
@@ -684,7 +684,13 @@ def summarize(sessions):
                    "in_progress": sum(active.values()),
                    "median_minutes": (median([s["total_time_ms"] for s in sessions
                                               if s.get("total_time_ms")]) or 0) / 60000 or None},
-        "lists": [{"list_id": k, "items": len(LISTS[k]), "completed": done[k], "in_progress": active[k]}
+        "lists": [{"list_id": k, "items": len(LISTS[k]), "completed": done[k], "in_progress": active[k],
+                   # What the list shows, for the admin page: its images (checks marked) and its rankings.
+                   "stimuli": [{"sample_id": i, "prompt": BY_ID[i]["prompt"], "file_name": BY_ID[i]["file_name"],
+                                "check": is_attention_check(BY_ID[i])} for i in LISTS[k]],
+                   "rankings": [{"set_id": r, "prompt": SET_BY_ID[r]["prompt"],
+                                 "images": [im["file_name"] for im in SET_BY_ID[r]["images"]]}
+                                for r in LIST_RANKINGS[k]]}
                   for k in range(len(LISTS))],
         "categories": categories, "pairs": pairs, "stimuli": stimuli, "rankings": summarize_rankings(included),
         # No Prolific IDs here: the page only needs to tell sessions apart.
