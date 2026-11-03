@@ -312,7 +312,7 @@ class StimulusPlugin {
   }
 }
 
-// Several images for one text: tap them from favourite to least favourite. Tapping a ranked image
+// Several images for one text: tap them from the one that fits the text best to the one that fits it least. Tapping a ranked image
 // takes it out; every image is placed by the participant, including the last.
 class RankingPlugin {
   static info = { name: "ranking", parameters: {
@@ -335,7 +335,7 @@ class RankingPlugin {
       <div class="card">
         <div class="prompt"><span class="lbl">Text</span><q class="text">${esc(r.prompt)}</q></div>
         ${r.visual_style ? `<div class="style"><span class="tag">${esc(styleLabel(r.visual_style))}</span>Judge what is shown, not the drawing style.</div>` : ""}
-        <p>Which of these would you rather get from an image generator for this text? Tap them from your favourite to your least favourite.</p>
+        <p>Tap the images from the one that fits the text best to the one that fits it least. If some fit equally well, put first the one you would rather get.</p>
         <div class="rank" style="--cols:${shown.length === 4 ? 2 : Math.min(shown.length, 3)}">${shown.map(im => `<button type="button" class="rk" data-id="${esc(im.image_id)}"><img src="${imageURL(im)}" alt="" draggable="false"><span class="badge" hidden></span></button>`).join("")}</div>
         <div class="marks" id="status"></div>
         <div class="nav"><button class="b" id="reset">Start over</button><button class="b primary" id="next" disabled>${t.practice ? "Start the ranking" : t.last ? "Submit my answers" : "Next"}</button></div>
@@ -471,7 +471,7 @@ async function main() {
       <p>This study is part of academic research on how people judge images made by AI image generators. It has ${rankings.length ? "two parts" : "one part"}:</p>
       <ol>
         <li><b>Rate images</b>: you will see ${stims.length} short texts, each with an image, and answer two quick questions about each.</li>
-        ${rankings.length ? `<li><b>Rank images</b>: ${rankings.length} times, you will put a few images for one text in order of preference.</li>` : ""}
+        ${rankings.length ? `<li><b>Rank images</b>: ${rankings.length} times, you will put a few images for one text in order, from the one that fits it best.</li>` : ""}
       </ol>
       <ul class="muted">
         <li>Participation is voluntary and you can stop at any time by closing this page.</li>
@@ -484,7 +484,7 @@ async function main() {
     { type: PagePlugin, button: "Begin", html: `
       <div class="prompt"><span class="lbl">Instructions</span><q>How to answer</q></div>
       <div class="notice" role="note">
-        <p><b>Please note.</b> Imagine you typed each text into an image generator and got this image back. You judge how well the image matches what the text asks for, not how beautiful or realistic it is.</p>
+        <p><b>Please note.</b> In this survey you will be shown text prompts and their corresponding images. Please judge to what degree each image matches the specifications of the prompt, not how beautiful or realistic it is.</p>
         <p><mark>This is your own judgement: there are no right or wrong answers.</mark></p>
       </div>
       <p>For each image, you answer two questions:</p>
@@ -500,16 +500,16 @@ async function main() {
     { type: StimulusPlugin, practice: true, stim: practiceStim },
     ...stims.map((s, i) => ({ type: StimulusPlugin, stim: s, index: i, total: stims.length, last: !rankings.length && i === stims.length - 1 })),
     ...(rankings.length ? [{ type: PagePlugin, button: "Start", progress: { on: 2, rate: 1, note: "Instructions" }, on_start: () => preload(rankImages), html: `
-      <div class="prompt"><span class="lbl">Last part</span><q>Which image would you prefer?</q></div>
+      <div class="prompt"><span class="lbl">Last part</span><q>Which image fits the text best?</q></div>
       <div class="notice" role="note">
-        <p><b>Please note.</b> You rank the images by which one you would rather get from an image generator for this text: how well each one matches what the text asks for.</p>
+        <p><b>Please note.</b> Rank the images by how well each one matches the text. When several images match it equally well, for example because the text leaves a detail open, put first the one you would rather get for this text.</p>
         <p>Some images show people. The ranking is never about the people themselves (their gender, ethnicity, religion, age, appearance or character). It is only about how the scene is shown, e.g., framing (a portrait, a close-up or a distant view), distance, background, composition, lighting, what else is in the picture, or details the text leaves open.</p>
         <p><mark>This is your own judgement: there are no right or wrong answers.</mark> Sometimes no order is objectively better: all the images may fit the text, or none of them. Then simply order them as you prefer.</p>
       </div>
-      <p>You will now see several images for the same text. Imagine you typed the text into an image generator and got all of them back.</p>
+      <p>You will now see several images for the same text.</p>
       <ul>
-        <li>Tap the images in order, from the one you would most like to keep to the one you would least like.</li>
-        <li>Go with your own preference.</li>
+        <li>Tap the images in order, from the one that fits the text best to the one that fits it least.</li>
+        <li>Go with your first impression.</li>
       </ul>
       <p class="muted">The first ranking is a practice round.</p>` },
       { type: RankingPlugin, practice: true, set: practiceSet }] : []),
