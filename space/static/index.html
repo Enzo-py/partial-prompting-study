@@ -130,7 +130,9 @@ const load = url => {
     const i = new Image(); IMAGES.set(url, i); i.onload = i.onerror = () => { LOADED.add(url); ok(); }; i.src = url; }));
   return LOADS.get(url);
 };
-const stimURLs = s => [imageURL(s), ...(s.seg_file ? [src(s.seg_file)] : [])];
+// Question 2 is turned off (see StimulusPlugin), so the segmentation maps are not loaded.
+// const stimURLs = s => [imageURL(s), ...(s.seg_file ? [src(s.seg_file)] : [])];
+const stimURLs = s => [imageURL(s)];
 // A loaded segmentation map: idAt(x, y) for x, y in 0..1, and draw() on a canvas laid over the image:
 // selected parts are hatched and outlined in red, marking them as the problem (not as a highlight);
 // the part under the mouse is outlined lightly.
@@ -237,7 +239,8 @@ class StimulusPlugin {
   }
   show(el, t) {
     const s = t.stim, t0 = performance.now();
-    const seg = s.seg_file ? segmentMap(src(s.seg_file)) : null;
+    // const seg = s.seg_file ? segmentMap(src(s.seg_file)) : null;
+    const seg = null;  // question 2 is turned off
     const r = { rating: null, problem: null, marks: [], segments: [], rating_changes: 0, rt_first_rating: null };
     el.innerHTML = `
       ${progress(this.prog(t))}
@@ -245,11 +248,12 @@ class StimulusPlugin {
         <div class="prompt"><span class="lbl">Text</span><q class="text">${esc(s.prompt)}</q></div>
         ${s.visual_style ? `<div class="style"><span class="tag">${esc(styleLabel(s.visual_style))}</span>Judge what is shown, not the drawing style.</div>` : ""}
         <div class="stim" id="stim"><img src="${imageURL(s)}" alt="" draggable="false">${seg ? `<canvas class="seg" width="${seg.w}" height="${seg.h}"></canvas>` : ""}</div>
-        <div class="q"><h3>1. How well does the image match the text?</h3>
+        <div class="q"><h3>How well does the image match the text?</h3>
           <div class="likert" role="radiogroup">${radios("rating", [[1,"Does not match"],[2,"Poorly"],[3,"Partly"],[4,"Mostly"],[5,"Fully matches"]], (v, l) => `<b>${v}</b>${l}`)}</div></div>
+        ${"" /* Question 2, turned off for now: uncomment it and the lines marked "question 2" below.
         <div class="q"><h3>2. Is there anything in the image that doesn’t match the text?</h3>
           <div class="row" role="radiogroup">${radios("problem", [["no","No"],["yes","Yes"]], (v, l) => l)}</div>
-          <div class="marks" id="marks" hidden></div></div>
+          <div class="marks" id="marks" hidden></div></div> */}
         <div class="nav"><button class="b primary" id="next" disabled>${t.practice ? "Start the study" : t.last ? "Submit my answers" : "Next"}</button></div>
       </div>`;
     window.scrollTo({ top: 0 });
@@ -271,8 +275,9 @@ class StimulusPlugin {
         marksEl.innerHTML = n ? `<span>${n} ${what}${n === 1 ? "" : "s"} selected${seg ? ` · ${tap.toLowerCase()} a part again to unselect it` : ""}</span><button class="link" id="clr">Clear</button>`
                               : `<span>Select at least one ${what} on the image.</span>`;
         const c = marksEl.querySelector("#clr"); if (c) c.onclick = () => { r.marks = []; r.segments = []; refresh(); };
-      } else marksEl.hidden = true;
-      next.disabled = !(r.rating && r.problem) || (r.problem === "yes" && !count());
+      } else if (marksEl) marksEl.hidden = true;
+      // next.disabled = !(r.rating && r.problem) || (r.problem === "yes" && !count());  // question 2
+      next.disabled = !r.rating;
     };
     el.querySelectorAll('input[name="rating"]').forEach(i => i.onchange = () => {
       if (r.rating !== null) r.rating_changes++; else r.rt_first_rating = Math.round(performance.now() - t0);
@@ -467,10 +472,10 @@ async function main() {
   addEventListener("beforeunload", leaveGuard);
   const timeline = [
     { type: PagePlugin, button: "I agree, continue", on_start: () => preload(rateImages), html: `
-      <div class="prompt"><span class="lbl">Research study · about ${Math.max(3, Math.round(1.5 + stims.length * 0.4 + rankings.length * 0.5))} minutes</span><q>Does the image match the text?</q></div>
+      <div class="prompt"><span class="lbl">Research study · about ${Math.max(3, Math.round(1.5 + stims.length * 0.3 + rankings.length * 0.5))} minutes</span><q>Does the image match the text?</q></div>
       <p>This study is part of academic research on how people judge images made by AI image generators. It has ${rankings.length ? "two parts" : "one part"}:</p>
       <ol>
-        <li><b>Rate images</b>: you will see ${stims.length} short texts, each with an image, and answer two quick questions about each.</li>
+        <li><b>Rate images</b>: you will see ${stims.length} short texts, each with an image, and rate how well each image matches its text.</li>
         ${rankings.length ? `<li><b>Rank images</b>: ${rankings.length} times, you will put a few images for one text in order, from the one that fits it best.</li>` : ""}
       </ol>
       <ul class="muted">
@@ -487,11 +492,13 @@ async function main() {
         <p><b>Please note.</b> In this survey you will be shown text prompts and their corresponding images. Please judge to what degree each image matches the specifications of the prompt, not how beautiful or realistic it is.</p>
         <p><mark>This is your own judgement: there are no right or wrong answers.</mark></p>
       </div>
+      <p>For each image, you answer one question: <b>How well does the image match the text?</b> Choose a score from 1 (does not match) to 5 (fully matches).</p>
+      <!-- Question 2, turned off for now:
       <p>For each image, you answer two questions:</p>
       <ol>
         <li><b>How well does the image match the text?</b> Choose a score from 1 (does not match) to 5 (fully matches).</li>
         <li><b>Is there anything in the image that doesn’t match the text?</b> If yes, click (or tap) on each part that doesn’t match to select it; on most images the whole object or region is selected at once. If not, answer <b>No</b>.</li>
-      </ol>
+      </ol> -->
       <ul>
         <li>Positions such as <b>left</b>, <b>right</b>, <b>above</b> or <b>below</b> are meant from your point of view as you look at the image, not from the point of view of someone or something in it.</li>
         <li>Go with your first impression.</li>

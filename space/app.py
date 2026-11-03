@@ -27,7 +27,7 @@ Environment variables (set them as Space secrets / variables):
   STUDY_CONTACT             optional; researcher contact shown on the consent page
   PID_SALT                  optional secret; saves a salted hash of the Prolific ID (never the ID itself)
   LIST_COUNT, LIST_SIZE     optional; number of lists (default: just enough to show every stimulus) and
-                            study images per list (default 7, at most)
+                            study images per list (default 12, at most)
   CHECKS_PER_LIST           optional; attention checks per list, rotating (default 3)
   RANKINGS_PER_LIST         optional; ranking questions after the ratings (default 5, 0 = none)
 """
@@ -265,7 +265,7 @@ PUBLIC_FIELDS = ("sample_id", "prompt", "file_name", "visual_style", "seg_file")
 
 
 LIST_COUNT = int(os.environ.get("LIST_COUNT") or 0)   # number of lists; 0 = just enough to show every stimulus
-LIST_SIZE = int(os.environ.get("LIST_SIZE", 7))      # study images per list (an upper bound), checks not included
+LIST_SIZE = int(os.environ.get("LIST_SIZE", 12))     # study images per list (an upper bound), checks not included
 CHECKS_PER_LIST = int(os.environ.get("CHECKS_PER_LIST", 3))  # attention checks per list, rotating
 RANKINGS_PER_LIST = int(os.environ.get("RANKINGS_PER_LIST", 5))  # ranking questions after the ratings
 
