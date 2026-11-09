@@ -9,7 +9,7 @@ Adds one column per quality check, the same rules as the Space (space/app.py, `q
                           object, 4+ for a wrong attribute, count, relation or binding)
   too_fast                25% or more of the images answered in under 1 s
   same_answers            99% or more of the ratings are identical
-then `n_failed_checks` (each failed attention check counts once) and `excluded` from 3 failed checks. `position` is the presentation order and `rt` the time
+then `n_failed_checks` (each failed attention check counts once) and `excluded` from 2 failed checks. `position` is the presentation order and `rt` the time
 spent on the image (ms, from display to "Next").
 
 Rankings go to a second file (--rankings-out), one row per ranked image (`image_id` from the dataset
@@ -73,7 +73,7 @@ df["failed_attention_check"] = df["session_id"].map(ctrl).fillna(0).astype(int)
 df["too_fast"] = df["session_id"].map(by_session["rt"].agg(lambda r: (r < 1000).mean() >= 0.25))
 df["same_answers"] = df["session_id"].map(by_session["rating"].agg(lambda r: r.value_counts(normalize=True).iloc[0] >= 0.99))
 df["n_failed_checks"] = df["failed_attention_check"] + df["too_fast"].astype(int) + df["same_answers"].astype(int)
-df["excluded"] = df["n_failed_checks"] >= 3
+df["excluded"] = df["n_failed_checks"] >= 2
 df.to_parquet(args.out, index=False)
 print(f"{df.session_id.nunique()} sessions ({df[df.excluded].session_id.nunique()} excluded), {len(df)} trials -> {args.out}")
 print(df.groupby(["case_id", "role"])["rating"].agg(["count", "mean", "std"]).round(2))

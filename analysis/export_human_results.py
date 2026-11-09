@@ -52,7 +52,7 @@ ap.add_argument("--include-excluded", action="store_true", help="keep the sessio
 args = ap.parse_args()
 
 # Quality checks: the same rules and thresholds as space/app.py.
-FAST_TRIAL_MS, FAST_SHARE, SAME_ANSWER_SHARE, EXCLUDE_AT = 1000, 0.25, 0.99, 3
+FAST_TRIAL_MS, FAST_SHARE, SAME_ANSWER_SHARE, EXCLUDE_AT = 1000, 0.25, 0.99, 2
 CHECK_FAIL_AT, CHECK_FAIL_AT_DEFAULT = {"absent": 3}, 4
 
 

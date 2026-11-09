@@ -603,7 +603,7 @@ def load_sessions(max_age=60):
 FAST_TRIAL_MS = 1000       # an image answered faster than this...
 FAST_SHARE = 0.25          # ...for this share of the images or more
 SAME_ANSWER_SHARE = 0.99   # share of identical ratings across a session
-EXCLUDE_AT = 3             # failed checks that exclude a session
+EXCLUDE_AT = 2             # failed checks that exclude a session
 # A check fails when the rating says the image matches. Only an absent object makes "Partly" (3)
 # wrong; a wrong colour, count or relation can honestly be rated 3, so those fail from "Mostly" (4).
 CHECK_FAIL_AT = {"absent": 3}

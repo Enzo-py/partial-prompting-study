@@ -44,7 +44,7 @@ pip install huggingface_hub pandas pyarrow
 python analysis/collect_responses.py Enzo-py/partial-prompting-responses --out responses.parquet
 ```
 
-Downloads every session, flattens to one row per trial, and flags the quality checks (attention check, many answers under 1 s, identical ratings), excluding a session from 3 failed checks. Downloaded responses are git-ignored; they stay in the private repo.
+Downloads every session, flattens to one row per trial, and flags the quality checks (attention check, many answers under 1 s, identical ratings), excluding a session from 2 failed checks. Downloaded responses are git-ignored; they stay in the private repo.
 
 To fill the dataset's post-study fields (`family_human` in `pairs/pairs.jsonl`, `ranking_human` in `groups/groups.jsonl`):
 

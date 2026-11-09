@@ -36,7 +36,7 @@ participant ──► Space (public URL, no login)
 
 **Progress.** Every page shows the same two-step bar, *1 · Rate images* then *2 · Rank images*, with the image or ranking number under it. The page adapts to phones: images fit the screen height, rankings use 2 columns on a phone and images up to 400 px wide on a large screen (3 per row, 2 × 2 for 4 images).
 
-**Quality checks.** Each attention check rated as matching counts as one failed check: 3 or more when the named object is absent, 4 or more for a wrong colour, count, relation or binding, since "Partly" (3) is an honest answer there (`CHECK_FAIL_AT`). Checks are judged with the labels saved in the session, so later dataset changes do not affect past sessions. 25% or more of the images answered in under 1 s also counts as a failed check, and so do 99% or more identical ratings. A session is excluded from the statistics and the feedback once it fails 3 checks; fewer are a warning in the dashboard (`FAST_TRIAL_MS`, `FAST_SHARE`, `SAME_ANSWER_SHARE`, `EXCLUDE_AT` in `app.py`; `analysis/collect_responses.py` applies the same rules). Excluded sessions still count towards list progress.
+**Quality checks.** Each attention check rated as matching counts as one failed check: 3 or more when the named object is absent, 4 or more for a wrong colour, count, relation or binding, since "Partly" (3) is an honest answer there (`CHECK_FAIL_AT`). Checks are judged with the labels saved in the session, so later dataset changes do not affect past sessions. 25% or more of the images answered in under 1 s also counts as a failed check, and so do 99% or more identical ratings. A session is excluded from the statistics and the feedback once it fails 2 checks; a single one is a warning in the dashboard (`FAST_TRIAL_MS`, `FAST_SHARE`, `SAME_ANSWER_SHARE`, `EXCLUDE_AT` in `app.py`; `analysis/collect_responses.py` applies the same rules). Excluded sessions still count towards list progress.
 
 **Prolific IDs are not saved.** The ID is used only to show the completion code. The session stores `source` (`prolific` or `direct`) and, if the `PID_SALT` secret is set, `pid_hash`: a salted hash that lets you find the session of a given Prolific submission (to reject or bonus it) by hashing its ID with the same salt, without the ID being in the data.
 
@@ -124,7 +124,7 @@ Safeguards: it is not announced beforehand, so it cannot push anyone to guess th
 
 `https://enzo-py-partial-prompting-study.hf.space/admin` shows the study while it runs: sessions completed and in progress, progress per list, exclusions, mean ratings by category, each minimal pair side by side, a table of every stimulus (rating distribution, "should not be there" rate, response time; click a row to see the image with every click mark) and the recent sessions.
 
-The page asks for `ADMIN_KEY` and stays closed until that secret is set. It reads the sessions from `RESPONSES_REPO` plus the ones not pushed yet, refreshed at most once a minute (the Refresh button forces it). Excluded sessions count in the progress but not in the statistics; the page shows each session's failed checks, as a warning below 3.
+The page asks for `ADMIN_KEY` and stays closed until that secret is set. It reads the sessions from `RESPONSES_REPO` plus the ones not pushed yet, refreshed at most once a minute (the Refresh button forces it). Excluded sessions count in the progress but not in the statistics; the page shows each session's failed checks, as a warning below 2.
 
 ## Analysis
 
