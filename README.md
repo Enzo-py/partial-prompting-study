@@ -15,7 +15,7 @@ partial-prompting-study/
 │   ├── hub/                  files synced to the stimuli dataset: card, taxonomy/, annotation/
 │   ├── svg/                  vector sources of the placeholder stimuli
 │   └── scripts/              push_to_hub.py, load_example.py
-├── analysis/                 collect_responses.py
+├── analysis/                 collect_responses.py, export_human_results.py
 └── .github/workflows/        deploy-space.yml, sync-dataset-card.yml
 ```
 
@@ -45,6 +45,14 @@ python analysis/collect_responses.py Enzo-py/partial-prompting-responses --out r
 ```
 
 Downloads every session, flattens to one row per trial, and flags the quality checks (attention check, many answers under 1 s, identical ratings), excluding a session from 3 failed checks. Downloaded responses are git-ignored; they stay in the private repo.
+
+To fill the dataset's post-study fields (`family_human` in `pairs/pairs.jsonl`, `ranking_human` in `groups/groups.jsonl`):
+
+```bash
+HF_TOKEN=... python analysis/export_human_results.py Enzo-py/partial-prompting-responses --out human_results
+```
+
+It writes both files in the dataset's format (every line and field kept, ready to replace the dataset's), plus `human/` with the numbers behind them: ratings per stimulus, the test-minus-reference difference with its 95% interval per pair, mean ranks per group, and each session's flags. Same exclusions as the Space. A pair is `sensitivity` when the interval lies below -0.5, `invariance` when it lies within ±0.5, else `open`; null under 10 ratings per member (`--margin`, `--min-ratings`, `--min-rankings`). A local folder of session files works in place of the repo id.
 
 ## Taxonomy
 

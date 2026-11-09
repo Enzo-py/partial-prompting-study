@@ -27,8 +27,9 @@ Environment variables (set them as Space secrets / variables):
   STUDY_CONTACT             optional; researcher contact shown on the consent page
   PID_SALT                  optional secret; saves a salted hash of the Prolific ID (never the ID itself)
   LIST_COUNT, LIST_SIZE     optional; number of lists (default: just enough to show every stimulus) and
-                            study images per list (default 14, at most)
-  CHECKS_PER_LIST           optional; attention checks per list, rotating (default 2)
+                            study images per list (default 14, at most); unused when the dataset has its
+                            own lists (`list` on every row)
+  CHECKS_PER_LIST           optional; attention checks per list, rotating (default 2); same
   RANKINGS_PER_LIST         optional; ranking questions after the ratings (default 5, 0 = none)
 """
 import hashlib
@@ -276,9 +277,11 @@ def in_study(s):
 
 
 def is_attention_check(s):
-    """A control whose text the image plainly contradicts (`control_type`: absent, relation, ...): its
-    answer is a rating of 1. Other controls (e.g. "every detail true") are the control condition of a
-    pair and are counterbalanced like any other stimulus. Older datasets mark the check as case E1."""
+    """The dataset's `attention_check` flag when it has one. Older datasets (and sessions saved with
+    them): a control whose text the image plainly contradicts (`control_type`: absent, relation, ...),
+    or case E1; other controls are the control condition of a pair, counterbalanced like the rest."""
+    if "attention_check" in s:
+        return bool(s["attention_check"])
     return s.get("role") == "control" and bool(
         s.get("control_type") or s.get("subcategory") == "Attention check" or s.get("case_id") == "E1")
 
@@ -343,13 +346,34 @@ def design_lists(ids, neighbours, n_lists, size, fixed=None, seed=0, restarts=10
     return best[1] if best else None
 
 
+def dataset_lists(study):
+    """The lists the dataset defines (`list` on every study row, from its tools/assign_lists.py), or
+    None when it does not. Stimuli that conflict (see `conflict`) in one list are only reported."""
+    if not study or any(not isinstance(s.get("list"), int) for s in study):
+        return None
+    lists = defaultdict(list)
+    for s in study:
+        lists[s["list"]].append(s)
+    for k, l in sorted(lists.items()):
+        for i, a in enumerate(l):
+            for b in l[i + 1:]:
+                if conflict(a, b):
+                    print(f"Note: list {k} has {a['sample_id']} and {b['sample_id']} together (same text, image or pair)")
+    return [sorted(s["sample_id"] for s in lists[k]) for k in sorted(lists)]
+
+
 def build_lists(stimuli):
-    """Counterbalanced lists: CHECKS_PER_LIST attention checks plus up to LIST_SIZE study images each,
-    never two conflicting stimuli together (see `conflict`), so each comparison is between-subjects.
+    """The dataset's own lists when every study row has a `list`. Otherwise counterbalanced lists built
+    here: CHECKS_PER_LIST attention checks plus up to LIST_SIZE study images each, never two
+    conflicting stimuli together (see `conflict`), so each comparison is between-subjects.
     Returns (lists, attention checks, stimuli not in the study).
     """
     study = [s for s in stimuli if in_study(s)]
     checks = sorted(s["sample_id"] for s in study if is_attention_check(s))
+    not_shown = [s["sample_id"] for s in stimuli if not in_study(s)]
+    given = dataset_lists(study)
+    if given:
+        return given, checks, not_shown
     items = sorted(s["sample_id"] for s in study if not is_attention_check(s))
     neighbours = {s["sample_id"]: set() for s in study}
     for a in study:
@@ -375,7 +399,6 @@ def build_lists(stimuli):
             break
     else:
         check_lists, lists = [[]], [[]]
-    not_shown = [s["sample_id"] for s in stimuli if not in_study(s)]
     return [sorted(c + l) for c, l in zip(check_lists, lists)], checks, not_shown
 
 
@@ -402,8 +425,8 @@ LIST_RANKINGS = assign_rankings(RANKING_SETS, len(LISTS))
     {"n_lists": len(LISTS), "attention_checks": CHECKS, "not_in_study": NOT_IN_STUDY,
      "exposure": dict(sorted(EXPOSURE.items())), "lists": LISTS,
      "ranking_sets": RANKING_SETS, "list_rankings": LIST_RANKINGS}, indent=2))
-print(f"{len(LISTS)} lists of {sorted({len(l) for l in LISTS})} images, {min(CHECKS_PER_LIST, len(CHECKS))} attention "
-      f"checks each; {len(NOT_IN_STUDY)} stimuli not in the study (human_study = false); "
+print(f"{len(LISTS)} lists of {sorted({len(l) for l in LISTS})} images ({'from the dataset' if all(isinstance(s.get('list'), int) for s in STUDY) else 'built here'}), "
+      f"{sorted({sum(i in CHECKS for i in l) for l in LISTS})} attention checks each; {len(NOT_IN_STUDY)} stimuli not in the study (human_study = false); "
       f"{len(RANKING_SETS)} ranking groups, {len(LIST_RANKINGS[0])} per list")
 
 

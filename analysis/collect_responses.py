@@ -64,6 +64,8 @@ by_session = df.groupby("session_id")
 # datasets). Other "control" stimuli are a pair's control condition, analysed like the rest.
 col = lambda c: df[c] if c in df else pd.Series(None, index=df.index)
 is_check = (df["role"] == "control") & (col("control_type").notna() | (col("subcategory") == "Attention check") | (col("case_id") == "E1"))
+# Datasets with an `attention_check` flag (saved with each trial) decide it themselves.
+is_check = col("attention_check").where(col("attention_check").notna(), is_check).astype(bool)
 # Failed = rated as matching: from 3 for an absent object, from 4 for a wrong colour, count or relation.
 fail_at = col("control_type").fillna("absent").map(lambda k: 3 if k == "absent" else 4)
 ctrl = (df["rating"] >= fail_at)[is_check].groupby(df["session_id"]).sum()
