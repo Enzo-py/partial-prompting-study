@@ -165,9 +165,9 @@ function render() {
   <header>
     <div><div class="eyebrow">Partial prompt study · ${esc(d.study_version)}</div><h1>Dashboard</h1></div>
     <div class="meta">
-      <span>Stimuli <span class="mono">${esc(d.dataset)}</span></span>
+      <span>Dataset <span class="mono">${esc(d.dataset)}</span></span>
       <span>Saving to <span class="mono">${esc(d.saving_to)}</span></span>
-      <span>Updated ${when(d.generated_at)} · <button id="refresh">Refresh</button></span>
+      <span>Updated ${when(d.generated_at)} · <button id="refresh">Refresh</button> · <button id="export" title="Download the results in the dataset's format (pairs.jsonl with family_human, groups.jsonl with ranking_human, and the numbers behind them)">Export results</button></span>
     </div>
   </header>
   ${d.saving_to.startsWith("local") ? `<div class="warnbox">Responses are not being pushed to the Hub. They will be lost when the Space restarts. Set <span class="mono">HF_TOKEN</span> and <span class="mono">RESPONSES_REPO</span>.</div>` : ""}
@@ -237,7 +237,7 @@ function render() {
   </section>` : ""}
 
   <section class="card">
-    <h2>Stimuli</h2>
+    <h2>Samples</h2>
     <p class="sub">Click a row to see the image with every click mark. Click a column header to sort.</p>
     <div class="tw"><table id="stimtable"></table></div>
   </section>
@@ -256,6 +256,7 @@ function render() {
     </table></div>
   </section>`;
   $("#refresh").onclick = () => load(true);
+  $("#export").onclick = () => { location.href = `/api/export?key=${encodeURIComponent(key)}`; };
   renderStimuli();
 }
 
@@ -264,7 +265,7 @@ function meanbar(m) {
 }
 
 const COLS = [
-  ["sample_id", "ID"], ["prompt", "Prompt"], ["case_id", "Case"],
+  ["sample_id", "ID"], ["list", "List", 1], ["prompt", "Prompt"], ["case_id", "Case"],
   ["n", "n", 1], ["mean", "Mean rating", 1], ["dist", "Ratings 1–5"], ["problem_rate", "Problem", 1],
   ["median_rt_s", "Median RT", 1],
 ];
@@ -282,6 +283,7 @@ function renderStimuli() {
     const peak = Math.max(1, ...s.dist);
     return `<tr class="stim" data-id="${esc(s.sample_id)}" aria-expanded="${open.has(s.sample_id)}" tabindex="0">
       <td class="mono">${esc(s.sample_id)}</td>
+      <td class="num">${s.list == null ? "–" : s.list}</td>
       <td><span class="prompt">${esc(s.prompt)}</span></td>
       <td>${s.attention_check ? `<span class="tag ctrl">attention check</span>` : `<span class="tag">${esc(s.case_id)}</span>`}</td>
       <td class="num">${s.n}</td>

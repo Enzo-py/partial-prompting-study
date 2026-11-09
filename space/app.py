@@ -45,7 +45,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
+
+import human_export
 from fastapi.staticfiles import StaticFiles
 
 ROOT = Path(__file__).resolve().parent
@@ -276,14 +278,7 @@ def in_study(s):
     return s.get("human_study", True) is not False
 
 
-def is_attention_check(s):
-    """The dataset's `attention_check` flag when it has one. Older datasets (and sessions saved with
-    them): a control whose text the image plainly contradicts (`control_type`: absent, relation, ...),
-    or case E1; other controls are the control condition of a pair, counterbalanced like the rest."""
-    if "attention_check" in s:
-        return bool(s["attention_check"])
-    return s.get("role") == "control" and bool(
-        s.get("control_type") or s.get("subcategory") == "Attention check" or s.get("case_id") == "E1")
+is_attention_check = human_export.is_attention_check
 
 
 def conflict(a, b):
@@ -560,7 +555,7 @@ def status(key: str = ""):
         raise HTTPException(403, "add ?key=ADMIN_KEY")
     now = time.time()
     return {"study_version": STUDY_VERSION,
-            "dataset": f"{DATASET_REPO}@{DATASET_SHA[:8]} ({DATASET_SPLIT}, {len(STIMULI)} stimuli)",
+            "dataset": f"{DATASET_REPO}@{DATASET_SHA[:8]} ({DATASET_SPLIT}, {len(STIMULI)} samples)",
             "n_lists": len(LISTS), "items_per_list": [len(l) for l in LISTS],
             "completed_per_list": {k: completed[k] for k in range(len(LISTS))},
             "in_progress": sum(1 for _, t in pending.values() if now - t < PENDING_TTL),
@@ -598,38 +593,14 @@ def load_sessions(max_age=60):
         return sessions
 
 
-# Quality checks. analysis/collect_responses.py applies the same rules. Each failed attention check
-# counts once; a session is excluded once it fails EXCLUDE_AT checks, fewer are only a warning.
-FAST_TRIAL_MS = 1000       # an image answered faster than this...
-FAST_SHARE = 0.25          # ...for this share of the images or more
-SAME_ANSWER_SHARE = 0.99   # share of identical ratings across a session
-EXCLUDE_AT = 2             # failed checks that exclude a session
-# A check fails when the rating says the image matches. Only an absent object makes "Partly" (3)
-# wrong; a wrong colour, count or relation can honestly be rated 3, so those fail from "Mostly" (4).
-CHECK_FAIL_AT = {"absent": 3}
-CHECK_FAIL_AT_DEFAULT = 4
-
-
-def failed_check(t):
-    """Whether a trial is an attention check rated as matching. Uses the labels saved with the trial,
-    so a session is judged on the stimuli it was shown even if the dataset changed since."""
-    s = t if "control_type" in t else BY_ID.get(t.get("sample_id"), {})  # older sessions: current labels
-    if not is_attention_check(s):
-        return False
-    kind = s.get("control_type") or "absent"  # the original check (E1, "a banana") is an absent object
-    return t["rating"] >= CHECK_FAIL_AT.get(kind, CHECK_FAIL_AT_DEFAULT)
+# Quality checks: the rules live in human_export.py, shared with the export (button and script).
+# analysis/collect_responses.py applies the same rules.
+EXCLUDE_AT = human_export.EXCLUDE_AT
 
 
 def quality_flags(session):
-    """The checks a session fails, one entry per failed attention-check stimulus."""
-    trials = [t for t in session.get("trials", []) if t.get("rating")]
-    flags = ["attention_check" for t in trials if failed_check(t)]
-    if trials and sum((t.get("rt") or 0) < FAST_TRIAL_MS for t in trials) / len(trials) >= FAST_SHARE:
-        flags.append("too_fast")
-    ratings = Counter(t["rating"] for t in trials)
-    if trials and ratings.most_common(1)[0][1] / len(trials) >= SAME_ANSWER_SHARE:
-        flags.append("same_answers")
-    return flags
+    """The checks a session fails, one entry per failed attention-check sample."""
+    return human_export.quality_flags(session, BY_ID)
 
 
 def is_excluded(session):
@@ -668,6 +639,7 @@ def summarize(sessions):
             **{k: st.get(k) for k in ("sample_id", "prompt", "file_name", "case_id", "category",
                                       "category_name", "subcategory", "role")},
             "attention_check": is_attention_check(st),
+            "list": next((k for k, l in enumerate(LISTS) if st["sample_id"] in l), None),
             "n": len(ts), "mean": mean(ratings),
             "dist": [ratings.count(r) for r in range(1, 6)],
             "problem_rate": mean([t.get("problem", t.get("unwanted")) == "yes" for t in ts]),
@@ -697,7 +669,7 @@ def summarize(sessions):
     recent = sorted(sessions, key=lambda s: s.get("received_at") or "", reverse=True)[:100]
     return {
         "study_version": STUDY_VERSION,
-        "dataset": f"{DATASET_REPO}@{DATASET_SHA[:8]} ({DATASET_SPLIT}, {len(STIMULI)} stimuli)",
+        "dataset": f"{DATASET_REPO}@{DATASET_SHA[:8]} ({DATASET_SPLIT}, {len(STIMULI)} samples)",
         "saving_to": RESPONSES_REPO if scheduler else "local folder only (RESPONSES_REPO or HF_TOKEN missing)",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "totals": {"completed": len(sessions), "excluded": len(sessions) - len(included),
@@ -757,6 +729,32 @@ def summary(key: str = "", refresh: bool = False):
     if key != ADMIN_KEY:
         raise HTTPException(403, "wrong key")
     return summarize(list(load_sessions(max_age=0 if refresh else 60).values()))
+
+
+@app.get("/api/export")
+def export_results(key: str = ""):
+    """The human results in the dataset's format, as a zip (see human_export.py): every saved session,
+    including the ones not pushed to RESPONSES_REPO yet, against this dataset revision."""
+    if not ADMIN_KEY:
+        raise HTTPException(403, "set the ADMIN_KEY secret on the Space to enable the export")
+    if key != ADMIN_KEY:
+        raise HTTPException(403, "wrong key")
+    import io
+    import zipfile
+    from huggingface_hub import hf_hub_download
+    read = lambda f: [json.loads(l) for l in Path(hf_hub_download(DATASET_REPO, f, repo_type="dataset", revision=DATASET_SHA,
+                                                                  token=HF_TOKEN)).read_text().splitlines() if l.strip()]
+    sessions = list(load_sessions(max_age=0).values())
+    files, note = human_export.export(sessions, STIMULI, read("pairs/pairs.jsonl"), read(GROUPS_FILE))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for path, rows in files.items():
+            z.writestr(path, human_export.jsonl(rows))
+        z.writestr("README.txt", f"{note}\nDataset {DATASET_REPO}@{DATASET_SHA}, exported {datetime.now(timezone.utc).isoformat()}.\n"
+                                 f"Rules and fields: human_export.py in the Space.\n")
+    name = f"human_results_{datetime.now(timezone.utc):%Y%m%d_%H%M}.zip"
+    return Response(buf.getvalue(), media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 # ---------------------------------------------------------------- participant feedback

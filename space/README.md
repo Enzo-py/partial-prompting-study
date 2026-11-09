@@ -36,7 +36,7 @@ participant ──► Space (public URL, no login)
 
 **Progress.** Every page shows the same two-step bar, *1 · Rate images* then *2 · Rank images*, with the image or ranking number under it. The page adapts to phones: images fit the screen height, rankings use 2 columns on a phone and images up to 400 px wide on a large screen (3 per row, 2 × 2 for 4 images).
 
-**Quality checks.** Each attention check rated as matching counts as one failed check: 3 or more when the named object is absent, 4 or more for a wrong colour, count, relation or binding, since "Partly" (3) is an honest answer there (`CHECK_FAIL_AT`). Checks are judged with the labels saved in the session, so later dataset changes do not affect past sessions. 25% or more of the images answered in under 1 s also counts as a failed check, and so do 99% or more identical ratings. A session is excluded from the statistics and the feedback once it fails 2 checks; a single one is a warning in the dashboard (`FAST_TRIAL_MS`, `FAST_SHARE`, `SAME_ANSWER_SHARE`, `EXCLUDE_AT` in `app.py`; `analysis/collect_responses.py` applies the same rules). Excluded sessions still count towards list progress.
+**Quality checks.** Each attention check rated as matching counts as one failed check: 3 or more when the named object is absent, 4 or more for a wrong colour, count, relation or binding, since "Partly" (3) is an honest answer there (`CHECK_FAIL_AT`). Checks are judged with the labels saved in the session, so later dataset changes do not affect past sessions. 25% or more of the images answered in under 1 s also counts as a failed check, and so do 99% or more identical ratings. A session is excluded from the statistics and the feedback once it fails 2 checks; a single one is a warning in the dashboard (`FAST_TRIAL_MS`, `FAST_SHARE`, `SAME_ANSWER_SHARE`, `EXCLUDE_AT` in `human_export.py`, shared by the Space and the export; `analysis/collect_responses.py` applies the same rules). Excluded sessions still count towards list progress.
 
 **Prolific IDs are not saved.** The ID is used only to show the completion code. The session stores `source` (`prolific` or `direct`) and, if the `PID_SALT` secret is set, `pid_hash`: a salted hash that lets you find the session of a given Prolific submission (to reject or bonus it) by hashing its ID with the same salt, without the ID being in the data.
 
@@ -133,18 +133,19 @@ python analysis/collect_responses.py Enzo-py/partial-prompting-responses --out r
 ```
 Downloads every session, flattens to one row per trial, and adds one column per quality check plus `n_failed_checks` and `excluded`. Rankings go to `rankings.parquet`, one row per ranked image.
 
-To fill the dataset's post-study fields (`family_human` in `pairs/pairs.jsonl`, `ranking_human` in `groups/groups.jsonl`):
+To fill the dataset's post-study fields (`family_human` in `pairs/pairs.jsonl`, `ranking_human` in `groups/groups.jsonl`), click **Export results** on the admin page: it downloads a zip with every saved session, including the ones not pushed to the responses repo yet. The same files from a terminal:
 
 ```bash
 HF_TOKEN=... python analysis/export_human_results.py Enzo-py/partial-prompting-responses --out human_results
 ```
 
-It writes both files in the dataset's format (every line and field kept, ready to replace the dataset's), plus `human/` with the numbers behind them: ratings per stimulus, the test-minus-reference difference with its 95% interval per pair, mean ranks per group, and each session's flags. Same exclusions as the Space. A pair is `sensitivity` when the interval lies below -0.5, `invariance` when it lies within ±0.5, else `open`; null under 10 ratings per member (`--margin`, `--min-ratings`, `--min-rankings`). A local folder of session files works in place of the repo id.
+It writes both files in the dataset's format (every line and field kept, ready to replace the dataset's), plus `human/` with the numbers behind them: ratings per stimulus, the test-minus-reference difference with its 95% interval per pair, mean ranks per group, and each session's flags. Same exclusions as the Space. A pair is `sensitivity` when the interval lies below -0.5, `invariance` when it lies within ±0.5, else `open`; null under 10 ratings per member (`--margin`, `--min-ratings`, `--min-rankings`). A local folder of session files works in place of the repo id. The button and the script share `space/human_export.py`, so they give the same files.
 
 ## Files
 
 ```
 app.py               backend (dataset loading, lists, assignment, saving)
+human_export.py      quality checks and the results export (admin button and analysis/export_human_results.py)
 static/index.html    jsPsych experiment
 static/admin.html    dashboard (/admin)
 static/vendor/       jsPsych 7.3.4 (vendored, no CDN dependency)
