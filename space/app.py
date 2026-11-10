@@ -835,9 +835,13 @@ async def feedback(req: Request):
     return {"feedback": feedback_for(json.loads(path.read_text()))}
 
 
+# The pages are always revalidated: a page cached from before a deploy would talk to the new API.
+NO_CACHE = {"Cache-Control": "no-cache"}
+
+
 @app.get("/admin")
 def admin():
-    return FileResponse(ROOT / "static" / "admin.html")
+    return FileResponse(ROOT / "static" / "admin.html", headers=NO_CACHE)
 
 
 app.mount("/stimuli", StaticFiles(directory=STIM_DIR), name="stimuli")
@@ -846,4 +850,4 @@ app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 @app.get("/")
 def index():
-    return FileResponse(ROOT / "static" / "index.html")
+    return FileResponse(ROOT / "static" / "index.html", headers=NO_CACHE)
