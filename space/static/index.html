@@ -72,6 +72,12 @@ h1{font-size:22px;font-weight:600;line-height:1.3;margin:0 0 8px}
 .rk img{width:100%;height:auto;display:block;border-radius:3px}
 .rk.on{border-color:var(--accent)}
 .rk:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.rank-texts{display:flex;flex-direction:column;gap:8px}
+.card:has(.rank-texts) .stim img{max-height:40vh}  /* the texts to rank stay in view */
+.rk.rt{display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:48px;line-height:1.35;text-align:left;font:inherit;font-size:15px;color:var(--ink);border:1px solid var(--line)}
+.rk.rt.on{border:1px solid var(--accent);background:var(--accent-soft)}
+.rk.rt .badge{position:static;flex:none}
+.rk.rt .badge[hidden]{display:block;visibility:hidden}
 .rk .badge{position:absolute;top:6px;left:6px;width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--bg);font:600 16px/30px var(--font);text-align:center}
 .fb{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:20px}
 .fbcase{display:grid;grid-template-columns:minmax(0,200px) 1fr;gap:16px;align-items:start;margin-top:4px}
@@ -325,23 +331,28 @@ class RankingPlugin {
     practice: { type: PT.BOOL, default: false }, last: { type: PT.BOOL, default: false } } };
   constructor(jsPsych) { this.jsPsych = jsPsych; }
   trial(el, t) {
-    return whenLoaded(el, t.set.images.map(imageURL), this.prog(t)).then(() => this.show(el, t));
+    return whenLoaded(el, [...new Set(t.set.images.map(imageURL))], this.prog(t)).then(() => this.show(el, t));
   }
   prog(t) {
     return t.practice ? { on: 2, rate: 1, note: "Practice · this one is not used, it is only to try the ranking" }
                       : { on: 2, rate: 1, rank: t.index / t.total, note: `Ranking ${t.index + 1} of ${t.total}` };
   }
+  // An image group (`axis` image) ranks images under one text; a prompt group ranks texts on one image.
   show(el, t) {
-    const r = t.set, t0 = performance.now();
+    const r = t.set, t0 = performance.now(), texts = r.axis === "prompt";
     const shown = this.jsPsych.randomization.shuffle(r.images);
+    const what = texts ? "text" : "image";
     let order = [], resets = 0;
     el.innerHTML = `
       ${progress(this.prog(t))}
       <div class="card">
-        <div class="prompt"><span class="lbl">Text</span><q class="text">${esc(r.prompt)}</q></div>
+        ${texts ? `<div class="stim"><img src="${imageURL(shown[0])}" alt="" draggable="false"></div>`
+                : `<div class="prompt"><span class="lbl">Text</span><q class="text">${esc(r.prompt)}</q></div>`}
         ${r.visual_style ? `<div class="style"><span class="tag">${esc(styleLabel(r.visual_style))}</span>Judge what is shown, not the drawing style.</div>` : ""}
-        <p>Tap the images from the one that fits the text best to the one that fits it least. If some fit equally well, put first the one you would rather get.</p>
-        <div class="rank" style="--cols:${shown.length === 4 ? 2 : Math.min(shown.length, 3)}">${shown.map(im => `<button type="button" class="rk" data-id="${esc(im.image_id)}"><img src="${imageURL(im)}" alt="" draggable="false"><span class="badge" hidden></span></button>`).join("")}</div>
+        <p>${texts ? "Tap the texts from the one that fits the image best to the one that fits it least."
+                   : "Tap the images from the one that fits the text best to the one that fits it least. If some fit equally well, put first the one you would rather get."}</p>
+        ${texts ? `<div class="rank-texts">${shown.map(im => `<button type="button" class="rk rt" data-id="${esc(im.id)}"><span class="badge" hidden></span><span>${esc(im.prompt)}</span></button>`).join("")}</div>`
+                : `<div class="rank" style="--cols:${shown.length === 4 ? 2 : Math.min(shown.length, 3)}">${shown.map(im => `<button type="button" class="rk" data-id="${esc(im.id)}"><img src="${imageURL(im)}" alt="" draggable="false"><span class="badge" hidden></span></button>`).join("")}</div>`}
         <div class="marks" id="status"></div>
         <div class="nav"><button class="b" id="reset">Start over</button><button class="b primary" id="next" disabled>${t.practice ? "Start the ranking" : t.last ? "Submit my answers" : "Next"}</button></div>
       </div>`;
@@ -354,7 +365,7 @@ class RankingPlugin {
         badge.hidden = k < 0; badge.textContent = k + 1; b.classList.toggle("on", k >= 0);
         b.setAttribute("aria-label", k < 0 ? "Not ranked yet" : `Ranked ${k + 1}`);
       });
-      status.textContent = order.length < shown.length ? `Tap the image you would put ${ordinal(order.length + 1)}.` : "Done. Tap an image to take it out, or Start over.";
+      status.textContent = order.length < shown.length ? `Tap the ${what} you would put ${ordinal(order.length + 1)}.` : `Done. Tap ${texts ? "a text" : "an image"} to take it out, or Start over.`;
       next.disabled = order.length !== shown.length;
     };
     el.querySelectorAll(".rk").forEach(b => b.onclick = () => {
@@ -366,7 +377,7 @@ class RankingPlugin {
     next.onclick = () => {
       el.innerHTML = "";
       this.jsPsych.finishTrial({ trial_kind: t.practice ? "practice_ranking" : "ranking", set_id: r.set_id, position: t.index + 1,
-        shown: shown.map(im => im.image_id), order, resets, rt: Math.round(performance.now() - t0) });
+        axis: r.axis || "image", shown: shown.map(im => im.id), order, resets, rt: Math.round(performance.now() - t0) });
     };
     refresh();
   }
@@ -464,11 +475,12 @@ async function main() {
   const stims = jsPsych.randomization.shuffle(SESSION.stimuli);
   const practiceStim = { sample_id: "practice", prompt: "A butterfly on a flower", src: "/static/practice/butterfly.jpg", visual_style: "photo" };
   const practiceSet = { set_id: "practice", prompt: "A butterfly on a flower", visual_style: "photo",
-    images: ["butterfly", "macaw", "bluebird"].map(n => ({ image_id: n, src: `/static/practice/${n}.jpg` })) };
+    images: ["butterfly", "macaw", "bluebird"].map(n => ({ id: n, src: `/static/practice/${n}.jpg` })) };
   // Step 1 images load while the participant reads the consent and instructions, step 2 images on
   // the ranking instructions, in the order they will be shown.
   const rateImages = [practiceStim, ...stims].flatMap(stimURLs);
-  const rankImages = [practiceSet, ...rankings].flatMap(r => r.images.map(imageURL));
+  const rankImages = [...new Set([practiceSet, ...rankings].flatMap(r => r.images.map(imageURL)))];
+  const rankTexts = rankings.some(r => r.axis === "prompt");
   addEventListener("beforeunload", leaveGuard);
   const timeline = [
     { type: PagePlugin, button: "I agree, continue", on_start: () => preload(rateImages), html: `
@@ -476,7 +488,7 @@ async function main() {
       <p>This study is part of academic research on how people judge images made by AI image generators. It has ${rankings.length ? "two parts" : "one part"}:</p>
       <ol>
         <li><b>Rate images</b>: you will see ${stims.length} short texts, each with an image, and rate how well each image matches its text.</li>
-        ${rankings.length ? `<li><b>Rank images</b>: ${rankings.length} times, you will put a few images for one text in order, from the one that fits it best.</li>` : ""}
+        ${rankings.length ? `<li><b>Rank images</b>: ${rankings.length} times, you will put a few images for one text${rankTexts ? " (or a few texts for one image)" : ""} in order, from the one that fits best.</li>` : ""}
       </ol>
       <ul class="muted">
         <li>Participation is voluntary and you can stop at any time by closing this page.</li>
@@ -513,9 +525,10 @@ async function main() {
         <p>Some images show people. The ranking is never about the people themselves (their gender, ethnicity, religion, age, appearance or character). It is only about how the scene is shown, e.g., framing (a portrait, a close-up or a distant view), distance, background, composition, lighting, what else is in the picture, or details the text leaves open.</p>
         <p><mark>This is your own judgement: there are no right or wrong answers.</mark> Sometimes no order is objectively better: all the images may fit the text, or none of them. Then simply order them as you prefer.</p>
       </div>
-      <p>You will now see several images for the same text.</p>
+      <p>You will now see several images for the same text${rankTexts ? ", or one image with several texts" : ""}.</p>
       <ul>
         <li>Tap the images in order, from the one that fits the text best to the one that fits it least.</li>
+        ${rankTexts ? `<li>When there is one image and several texts, tap the texts in order, from the one that fits the image best to the one that fits it least.</li>` : ""}
         <li>Go with your first impression.</li>
       </ul>
       <p class="muted">The first ranking is a practice round.</p>` },

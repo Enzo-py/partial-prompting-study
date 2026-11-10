@@ -90,7 +90,12 @@ tr.stim[aria-expanded=true] td{background:var(--accent-soft)}
 .detail dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0;font-size:13px;max-width:520px}
 .detail dt{color:var(--muted)}
 .detail dd{margin:0}
-/* pairs */
+/* rankings of texts on one image */
+.rtexts,.ltexts{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.rtexts img{width:160px;border-radius:4px}
+.ltexts figure{margin:0;width:110px}
+.rtexts ol,.ltexts ul{margin:0;padding-left:20px;font-size:13px;display:flex;flex-direction:column;gap:4px;flex:1;min-width:220px}
+/* series */
 .pairs{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px 28px}
 .pair{display:flex;flex-direction:column;gap:6px}
 .pair .head{display:flex;justify-content:space-between;align-items:baseline;color:var(--muted);font-size:12.5px}
@@ -167,7 +172,7 @@ function render() {
     <div class="meta">
       <span>Dataset <span class="mono">${esc(d.dataset)}</span></span>
       <span>Saving to <span class="mono">${esc(d.saving_to)}</span></span>
-      <span>Updated ${when(d.generated_at)} · <button id="refresh">Refresh</button> · <button id="export" title="Download the results in the dataset's format (pairs.jsonl with family_human, groups.jsonl with ranking_human, and the numbers behind them)">Export results</button></span>
+      <span>Updated ${when(d.generated_at)} · <button id="refresh">Refresh</button> · <button id="export" title="Download the results in the dataset's format (metadata.jsonl with mean_human_score and details_human_score, groups.jsonl with ranking_human and details_ranking_human)">Export results</button></span>
     </div>
   </header>
   ${d.saving_to.startsWith("local") ? `<div class="warnbox">Responses are not being pushed to the Hub. They will be lost when the Space restarts. Set <span class="mono">HF_TOKEN</span> and <span class="mono">RESPONSES_REPO</span>.</div>` : ""}
@@ -194,8 +199,10 @@ function render() {
           <img src="/stimuli/${s.file_name.split("/").map(encodeURIComponent).join("/")}" alt="" loading="lazy">
           <figcaption><span class="mono">${esc(s.sample_id)}</span>${s.check ? ` <span class="tag">check</span>` : ""}<br>${esc(s.prompt)}</figcaption></figure>`).join("")}</div>
         ${l.rankings.length ? `<h3>${l.rankings.length} rankings</h3>${l.rankings.map(r => `<div class="lrank">
-          <span><span class="prompt">${esc(r.prompt)}</span> <span class="mono muted">${esc(r.set_id)}</span></span>
-          <div class="imgs">${r.images.map(f => `<figure><img src="/stimuli/${f.split("/").map(encodeURIComponent).join("/")}" alt="" loading="lazy"></figure>`).join("")}</div>
+          <span><span class="prompt">${r.axis === "prompt" ? "Texts for one image" : esc(r.prompt)}</span> <span class="mono muted">${esc(r.set_id)}</span></span>
+          ${r.axis === "prompt"
+            ? `<div class="ltexts"><figure><img src="/stimuli/${r.images[0].split("/").map(encodeURIComponent).join("/")}" alt="" loading="lazy"></figure><ul>${r.prompts.map(p => `<li>${esc(p)}</li>`).join("")}</ul></div>`
+            : `<div class="imgs">${r.images.map(f => `<figure><img src="/stimuli/${f.split("/").map(encodeURIComponent).join("/")}" alt="" loading="lazy"></figure>`).join("")}</div>`}
         </div>`).join("")}` : ""}
       </div></details>`).join("")}
     </div>
@@ -203,22 +210,22 @@ function render() {
 
   <section class="card">
     <h2>By category</h2>
-    <p class="sub">Attention check left out. Rating from 1 (does not match) to 5 (matches). Excluded sessions are left out of every statistic below.</p>
+    <p class="sub">Per category and level, attention checks left out. Rating from 1 (does not match) to 5 (matches); “Expected” is the mean hypothetical score. Excluded sessions are left out of every statistic below.</p>
     <div class="tw"><table>
-      <thead><tr><th>Category</th><th class="num">Ratings</th><th class="num">Mean rating</th><th class="num">“Problem” marked</th></tr></thead>
+      <thead><tr><th>Category</th><th>Level</th><th class="num">Ratings</th><th class="num">Mean rating</th><th class="num">Expected</th></tr></thead>
       <tbody>${d.categories.map(c => `<tr>
-        <td><span class="tag">${esc(c.category)}</span> ${esc(c.name)}</td>
-        <td class="num">${c.n}</td><td class="num">${meanbar(c.mean)}</td><td class="num">${pct(c.problem_rate)}</td></tr>`).join("")}</tbody>
+        <td><span class="tag">${esc(c.category)}</span></td><td class="mono">${esc(c.level)}</td>
+        <td class="num">${c.n}</td><td class="num">${meanbar(c.mean)}</td><td class="num">${fmt(c.hypothetical)}</td></tr>`).join("")}</tbody>
     </table></div>
   </section>
 
   <section class="card">
-    <h2>Minimal pairs</h2>
-    <p class="sub">Members of a pair are seen by different participants. Compare their mean ratings.</p>
-    <div class="pairs">${d.pairs.map(p => `<div class="pair">
-      <div class="head"><span class="mono">${esc(p.pair_id)}</span></div>
-      ${p.members.map(m => `<div class="pm" title="${esc(m.sample_id)}: n = ${m.n}">
-        <span><span class="mono">${esc(m.sample_id)}</span> <span class="prompt">${esc(m.prompt)}</span>${m.pair_role ? ` <span class="tag">${esc(m.pair_role)}</span>` : ""}</span>
+    <h2>Series</h2>
+    <p class="sub">One prompt over several images (IMG-*) or one image under several prompts (TXT-*). Members of a series are seen by different participants: compare their mean ratings with the expected score.</p>
+    <div class="pairs">${d.series.map(p => `<div class="pair">
+      <div class="head"><span class="mono">${esc(p.series_id)}</span></div>
+      ${p.members.map(m => `<div class="pm" title="${esc(m.sample_id)}: ${esc(m.category)} · ${esc(m.level)}, expected ${m.hypothetical ?? "–"}, n = ${m.n}">
+        <span><span class="mono">${esc(m.sample_id)}</span> <span class="prompt">${esc(m.prompt)}</span> <span class="tag">${esc(m.level)}</span></span>
         <div class="t">${m.mean != null ? `<i style="width:${(m.mean - 1) / 4 * 100}%"></i>` : ""}</div>
         <span class="v">${fmt(m.mean)} <span class="muted">n${m.n}</span></span></div>`).join("")}
     </div>`).join("")}</div>
@@ -226,13 +233,15 @@ function render() {
 
   ${d.rankings.length ? `<section class="card">
     <h2>Rankings</h2>
-    <p class="sub">Images shown together for one text, ordered by mean rank (1 = favourite). “First” is how often each image was ranked first.</p>
+    <p class="sub">Images shown together for one text, or texts for one image, ordered by mean rank (1 = best). “First” is how often each was ranked first.</p>
     <div class="rankings">${d.rankings.map(r => `<div class="rset">
-      <div class="head"><span class="prompt">${esc(r.prompt)}</span> <span class="muted">${esc(r.set_id)} · n${r.n}</span></div>
-      <div class="rimgs">${r.images.map(im => `<figure title="${esc(im.image_id)}${im.sample_id ? " · " + esc(im.sample_id) : ""}${im.case_id ? " · " + esc(im.case_id) : ""}">
+      <div class="head"><span class="prompt">${r.axis === "prompt" ? "Texts for one image" : esc(r.prompt)}</span> <span class="muted">${esc(r.set_id)} · lists ${esc((r.lists || []).join(", "))} · n${r.n}</span></div>
+      ${r.axis === "prompt"
+        ? `<div class="rtexts"><img src="/stimuli/${r.images[0].file_name.split("/").map(encodeURIComponent).join("/")}" alt="" loading="lazy"><ol>${r.images.map(im => `<li title="${esc(im.sample_id || "ranked only")}${im.level ? " · " + esc(im.level) : ""}">${esc(im.prompt)} ${im.n ? `<b>${fmt(im.mean_rank, 1)}</b> <span class="muted">${pct(im.first)} first</span>` : ""}</li>`).join("")}</ol></div>`
+        : `<div class="rimgs">${r.images.map(im => `<figure title="${esc(im.image_id)}${im.sample_id ? " · " + esc(im.sample_id) : ""}${im.level ? " · " + esc(im.level) : ""}">
         <img src="/stimuli/${im.file_name.split("/").map(encodeURIComponent).join("/")}" alt="" loading="lazy">
         <figcaption>${im.n ? `<b>${fmt(im.mean_rank, 1)}</b> <span class="muted">${pct(im.first)} first</span><br>` : ""}<span class="mono muted">${esc(im.sample_id || im.image_id)}</span></figcaption>
-      </figure>`).join("")}</div>
+      </figure>`).join("")}</div>`}
     </div>`).join("")}</div>
   </section>` : ""}
 
@@ -265,7 +274,7 @@ function meanbar(m) {
 }
 
 const COLS = [
-  ["sample_id", "ID"], ["list", "List", 1], ["prompt", "Prompt"], ["case_id", "Case"],
+  ["sample_id", "ID"], ["list", "List", 1], ["prompt", "Prompt"], ["level", "Category · level"], ["hypothetical_score", "Expected", 1],
   ["n", "n", 1], ["mean", "Mean rating", 1], ["dist", "Ratings 1–5"], ["problem_rate", "Problem", 1],
   ["median_rt_s", "Median RT", 1],
 ];
@@ -285,7 +294,8 @@ function renderStimuli() {
       <td class="mono">${esc(s.sample_id)}</td>
       <td class="num">${s.list == null ? "–" : s.list}</td>
       <td><span class="prompt">${esc(s.prompt)}</span></td>
-      <td>${s.attention_check ? `<span class="tag ctrl">attention check</span>` : `<span class="tag">${esc(s.case_id)}</span>`}</td>
+      <td>${s.attention_check ? `<span class="tag ctrl">attention check</span> ` : `<span class="tag">${esc(s.category)}</span> `}<span class="mono">${esc(s.level || "")}</span></td>
+      <td class="num">${s.hypothetical_score ?? "–"}</td>
       <td class="num">${s.n}</td>
       <td class="num">${meanbar(s.mean)}</td>
       <td><span class="hist" title="${s.dist.map((c, i) => `${i + 1}: ${c}`).join(" · ")}">${s.dist.map(c => `<i class="${c ? "" : "zero"}" style="height:${c ? Math.max(3, c / peak * 26) : 1}px"></i>`).join("")}</span></td>
@@ -310,7 +320,9 @@ function detail(s) {
     <div class="stimimg"><img src="/stimuli/${encodeURIComponent(s.file_name)}" alt="${esc(s.prompt)}">
       ${s.marks.map(([x, y]) => `<div class="mk" style="left:${x * 100}%;top:${y * 100}%"></div>`).join("")}</div>
     <dl>
-      <dt>Category</dt><dd><span class="tag">${esc(s.category)}</span> ${esc(s.category_name)} · ${esc(s.subcategory)}</dd>
+      <dt>Category</dt><dd><span class="tag">${esc(s.category)}</span> ${esc(s.level || "")}${s.error ? ` · error: ${esc(s.error)}` : ""}</dd>
+      ${s.series_id ? `<dt>Series</dt><dd class="mono">${esc(s.series_id)}</dd>` : ""}
+      <dt>Expected</dt><dd>${s.hypothetical_score ?? "–"}</dd>
       <dt>Ratings</dt><dd>${s.dist.map((n, i) => `${i + 1}: <b>${n}</b>`).join(" · ")}</dd>
       <dt>Click marks</dt><dd>${s.marks.length}</dd>
       ${s.segments && s.segments.length ? `<dt>Parts selected</dt><dd>${s.segments.map(([c, n]) => `${esc(c)} ${n}`).join(", ")}</dd>` : ""}

@@ -1,17 +1,19 @@
 """Backend for the partial-prompt human study (Hugging Face Space, Docker SDK).
 
-- Builds counterbalanced lists from the stimuli dataset (one member of each minimal-pair group per participant).
+- Uses the dataset's annotation lists (`list`), or builds counterbalanced lists when it has none.
 - Assigns each new participant to the least-filled list.
 - Receives the final session JSON and writes it to DATA_DIR; a CommitScheduler pushes DATA_DIR
   to a private dataset repo every few minutes.
 
 Stimuli are loaded at startup from a Hugging Face dataset (DATASET_REPO), either an imagefolder
 (`metadata.jsonl` + image files) or parquet with embedded images. Required columns: `sample_id`,
-`prompt`, and the image (`file_name` / `image`). Optional: `human_study` (false = never shown),
-`role` + `control_type` (attention checks), `pair_ids`,
-`image_id`, plus any label columns (copied into the saved responses). Ranking questions come from
-`groups/groups.jsonl` when the dataset has one (one group per line: `group_id`, `prompt`,
-`visual_style`, `human_study`, `members` with `image_id` and `file_name` relative to `data/`).
+`prompt`, and the image (`file_name` / `image`). Optional: `list` (the annotation list), `category`
+(`attention_check` marks the checks, `level` the kind of error), `series_id`, `image_id`,
+`human_study` (false = never shown), plus any label columns (copied into the saved responses).
+Ranking questions come from `groups/groups.jsonl` when the dataset has one (one group per line:
+`group_id`, `axis` = image (rank images under one prompt) or prompt (rank prompts on one image),
+`prompt`, `visual_style`, `lists`, `members` with `image_id`, `file_name` relative to `data/`,
+`prompt` and `sample_id`).
 Restart the Space to pick up a new version of the dataset; the exact dataset commit is stored with
 every session.
 
@@ -164,8 +166,6 @@ def load_stimuli():
             if r.get(col) is None:
                 raise RuntimeError(f"Row without '{col}' in {', '.join(files)}")
         r["file_name"] = web_image(data, r["sample_id"])
-        r["role"] = r.get("role") or "test"
-        r["pair_ids"] = list(r.get("pair_ids") or [])
         r["image_id"] = r.get("image_id") or r["sample_id"]
         rows.append(r)
     ids = [r["sample_id"] for r in rows]
@@ -179,8 +179,10 @@ GROUPS_FILE = "groups/groups.jsonl"
 
 
 def load_groups(sha, repo_files):
-    """Ranking groups defined by the dataset: images to put in order under one prompt. Each image is
-    written to STIM_DIR/groups/<image_id>; groups with fewer than 2 images are skipped."""
+    """Ranking groups defined by the dataset. An image group ranks images under one prompt, a prompt
+    group prompts on one image. Each image is written to STIM_DIR/groups/<image_id>; groups with fewer
+    than 2 members to rank are skipped. Each member gets an `id`, what a ranking orders: its image_id,
+    or its prompt in a prompt group."""
     if GROUPS_FILE not in repo_files:
         print(f"No {GROUPS_FILE} in the dataset: no ranking questions")
         return []
@@ -191,22 +193,26 @@ def load_groups(sha, repo_files):
     local = Path(snapshot_download(DATASET_REPO, repo_type="dataset", revision=sha,
                                    allow_patterns=sorted(sources), token=HF_TOKEN))
     (STIM_DIR / "groups").mkdir(parents=True, exist_ok=True)
-    groups = []
+    groups, written = [], {}
     for n, g in enumerate(lines, 1):
         if g.get("human_study") is False:
             continue
-        images = {}
+        axis = g.get("axis") or "image"
+        items = {}
         for m in g.get("members") or []:
-            src = local / "data" / m["file_name"]
-            if not src.is_file():
-                raise RuntimeError(f"{GROUPS_FILE}, line {n}: image data/{m['file_name']} not found")
-            name = web_image(src.read_bytes(), f"groups/{m['image_id']}")
-            images[m["image_id"]] = {"image_id": m["image_id"], "sample_id": m.get("sample_id"), "file_name": name}
-        if len(images) < 2:
-            print(f"Skipping group {g.get('group_id')}: {len(images)} image(s), nothing to rank")
+            if m["image_id"] not in written:
+                src = local / "data" / m["file_name"]
+                if not src.is_file():
+                    raise RuntimeError(f"{GROUPS_FILE}, line {n}: image data/{m['file_name']} not found")
+                written[m["image_id"]] = web_image(src.read_bytes(), f"groups/{m['image_id']}")
+            key = human_export.member_key(g, m)
+            items[key] = {"id": key, "image_id": m["image_id"], "sample_id": m.get("sample_id"),
+                          "prompt": m.get("prompt"), "file_name": written[m["image_id"]]}
+        if len(items) < 2:
+            print(f"Skipping group {g.get('group_id')}: {len(items)} member(s), nothing to rank")
             continue
-        groups.append({"set_id": g["group_id"], "prompt": g["prompt"], "visual_style": g.get("visual_style"),
-                       "images": list(images.values())})
+        groups.append({"set_id": g["group_id"], "axis": axis, "prompt": g.get("prompt"), "visual_style": g.get("visual_style"),
+                       "lists": g.get("lists"), "images": list(items.values())})
     ids = [g["set_id"] for g in groups]
     if len(ids) != len(set(ids)):
         raise RuntimeError("group_id values must be unique")
@@ -260,7 +266,10 @@ def load_segments(sha, repo_files, stimuli):
 STIMULI, DATASET_SHA, REPO_FILES = load_stimuli()
 BY_ID = {s["sample_id"]: s for s in STIMULI}
 # Labels for the saved files: every dataset column except the ones already sent or stored elsewhere.
-LABEL_FIELDS = list(dict.fromkeys(k for s in STIMULI for k in s if k not in ("sample_id", "prompt", "file_name")))
+# The human results and the long descriptive fields stay in the dataset.
+LABEL_FIELDS = list(dict.fromkeys(k for s in STIMULI for k in s if k not in (
+    "sample_id", "prompt", "file_name", "mean_human_score", "details_human_score", "objects", "description",
+    "generation_prompt", "generation_seed", "segmentation")))
 
 # Public fields sent to the browser. Taxonomy labels stay server-side so participants never see them;
 # visual_style is shown above the image so the drawing style is not mistaken for a mismatch.
@@ -282,8 +291,11 @@ is_attention_check = human_export.is_attention_check
 
 
 def conflict(a, b):
-    """Two stimuli never go in the same list: same minimal pair, same image, or same text."""
-    return bool(set(a["pair_ids"]) & set(b["pair_ids"])) or a["image_id"] == b["image_id"] or a["prompt"] == b["prompt"]
+    """Two stimuli never go in the same list: same series (or minimal pair, in older datasets), same
+    image, or same text."""
+    return (bool(a.get("series_id")) and a.get("series_id") == b.get("series_id")
+            or bool(set(a.get("pair_ids") or []) & set(b.get("pair_ids") or []))
+            or a["image_id"] == b["image_id"] or a["prompt"] == b["prompt"])
 
 
 def design_lists(ids, neighbours, n_lists, size, fixed=None, seed=0, restarts=10, steps=20000):
@@ -353,7 +365,7 @@ def dataset_lists(study):
         for i, a in enumerate(l):
             for b in l[i + 1:]:
                 if conflict(a, b):
-                    print(f"Note: list {k} has {a['sample_id']} and {b['sample_id']} together (same text, image or pair)")
+                    print(f"Note: list {k} has {a['sample_id']} and {b['sample_id']} together (same text, image or series)")
     return [sorted(s["sample_id"] for s in lists[k]) for k in sorted(lists)]
 
 
@@ -380,7 +392,8 @@ def build_lists(stimuli):
     groups = Counter()
     for s in study:
         if not is_attention_check(s):
-            groups.update([("text", s["prompt"]), ("image", s["image_id"])] + [("pair", p) for p in s["pair_ids"]])
+            groups.update([("text", s["prompt"]), ("image", s["image_id"])] + [("pair", p) for p in s.get("pair_ids") or []]
+                          + ([("series", s["series_id"])] if s.get("series_id") else []))
     min_lists = max(groups.values(), default=1)
     # Largest list size that still fits: there may be fewer conflict-free items than LIST_SIZE asks.
     for size in range(min(LIST_SIZE, len(items)), 0, -1):
@@ -398,8 +411,11 @@ def build_lists(stimuli):
 
 
 def assign_rankings(sets, n_lists):
-    """RANKINGS_PER_LIST groups per list, each group in about as many lists, never two groups with
-    the same text in one list."""
+    """The lists the dataset gives each group (`lists`), when every group has them. Otherwise
+    RANKINGS_PER_LIST groups per list, each group in about as many lists, never two groups with the
+    same text in one list."""
+    if sets and all(isinstance(r.get("lists"), list) for r in sets):
+        return [sorted(r["set_id"] for r in sets if k in r["lists"]) for k in range(n_lists)]
     if not sets or not RANKINGS_PER_LIST:
         return [[] for _ in range(n_lists)]
     ids = [r["set_id"] for r in sets]
@@ -422,7 +438,7 @@ LIST_RANKINGS = assign_rankings(RANKING_SETS, len(LISTS))
      "ranking_sets": RANKING_SETS, "list_rankings": LIST_RANKINGS}, indent=2))
 print(f"{len(LISTS)} lists of {sorted({len(l) for l in LISTS})} images ({'from the dataset' if all(isinstance(s.get('list'), int) for s in STUDY) else 'built here'}), "
       f"{sorted({sum(i in CHECKS for i in l) for l in LISTS})} attention checks each; {len(NOT_IN_STUDY)} stimuli not in the study (human_study = false); "
-      f"{len(RANKING_SETS)} ranking groups, {len(LIST_RANKINGS[0])} per list")
+      f"{len(RANKING_SETS)} ranking groups, {sorted({len(l) for l in LIST_RANKINGS})} per list")
 
 
 # ---------------------------------------------------------------- persistence
@@ -480,8 +496,8 @@ async def start(req: Request):
         session_id = uuid.uuid4().hex
         pending[session_id] = (list_id, time.time())
     stimuli = [{k: BY_ID[i].get(k) for k in PUBLIC_FIELDS} for i in LISTS[list_id]]
-    rankings = [{k: SET_BY_ID[r][k] for k in ("set_id", "prompt", "visual_style")}
-                | {"images": [{k: im[k] for k in ("image_id", "file_name")} for im in SET_BY_ID[r]["images"]]}
+    rankings = [{k: SET_BY_ID[r][k] for k in ("set_id", "axis", "prompt", "visual_style")}
+                | {"images": [{k: im[k] for k in ("id", "file_name", "prompt")} for im in SET_BY_ID[r]["images"]]}
                 for r in LIST_RANKINGS[list_id]]
     return {"session_id": session_id, "list_id": list_id, "study_version": STUDY_VERSION,
             "stimuli": stimuli, "rankings": rankings,
@@ -508,15 +524,16 @@ async def submit(req: Request):
             known = SEGMENTS.get(s["image_id"], {})
             if t.get("segments"):
                 t["segments"] = [{"id": i, **known[i]} for i in t["segments"] if isinstance(i, int) and i in known]
-    # Rankings: keep only known groups and their own images (image_id), in the order the participant
-    # chose; the matching stimulus (sample_id, null for images rated only in the group) is added alongside.
+    # Rankings: keep only known groups and their own members (image_id, or the prompt in a prompt
+    # group), in the order the participant chose; the matching stimulus (sample_id, null for members
+    # ranked only) is added alongside.
     rankings = []
     for r in body.get("rankings") or []:
         st = SET_BY_ID.get(r.get("set_id"))
-        ims = {im["image_id"]: im for im in st["images"]} if st else {}
+        ims = {im["id"]: im for im in st["images"]} if st else {}
         order = r.get("order") or []
         if st and sorted(order) == sorted(ims):
-            rankings.append({**r, "prompt": st["prompt"], "visual_style": st["visual_style"],
+            rankings.append({**r, "axis": st["axis"], "prompt": st["prompt"], "visual_style": st["visual_style"],
                              "order_sample_ids": [ims[i]["sample_id"] for i in order]})
     body["rankings"] = rankings
     # Prolific IDs are never saved: only whether the participant came from Prolific, plus an optional
@@ -607,6 +624,13 @@ def is_excluded(session):
     return len(quality_flags(session)) >= EXCLUDE_AT
 
 
+def current(t):
+    """A rating of a sample as it is now: sample ids of an older dataset may name another sample, so
+    the saved text must be the sample's current text."""
+    st = BY_ID.get(t.get("sample_id"))
+    return bool(st) and t.get("prompt", st["prompt"]) == st["prompt"]
+
+
 def median(values):
     v = sorted(values)
     return (v[len(v) // 2] + v[(len(v) - 1) // 2]) / 2 if v else None
@@ -628,7 +652,7 @@ def summarize(sessions):
     trials = defaultdict(list)
     for s in included:
         for t in s.get("trials", []):
-            if t.get("sample_id") in BY_ID and t.get("rating"):
+            if current(t) and t.get("rating"):
                 trials[t["sample_id"]].append(t)
 
     stimuli = []
@@ -636,8 +660,8 @@ def summarize(sessions):
         ts = trials[st["sample_id"]]
         ratings = [t["rating"] for t in ts]
         stimuli.append({
-            **{k: st.get(k) for k in ("sample_id", "prompt", "file_name", "case_id", "category",
-                                      "category_name", "subcategory", "role")},
+            **{k: st.get(k) for k in ("sample_id", "prompt", "file_name", "category", "level", "error",
+                                      "series_id", "hypothetical_score")},
             "attention_check": is_attention_check(st),
             "list": next((k for k, l in enumerate(LISTS) if st["sample_id"] in l), None),
             "n": len(ts), "mean": mean(ratings),
@@ -651,20 +675,23 @@ def summarize(sessions):
     by_cat = defaultdict(list)
     for st in STUDY:
         if not is_attention_check(st):
-            by_cat[(st.get("category"), st.get("category_name"))] += trials[st["sample_id"]]
-    categories = [{"category": c, "name": name, "n": len(ts), "mean": mean([t["rating"] for t in ts]),
-                   "problem_rate": mean([t.get("problem", t.get("unwanted")) == "yes" for t in ts])}
-                  for (c, name), ts in sorted(by_cat.items(), key=lambda kv: str(kv[0][0]))]
+            by_cat[(st.get("category"), st.get("level"))].append(st)
+    categories = []
+    for (c, level), sts in sorted(by_cat.items(), key=lambda kv: (str(kv[0][0]), str(kv[0][1]))):
+        ts = [t for st in sts for t in trials[st["sample_id"]]]
+        categories.append({"category": c, "level": level, "n": len(ts), "mean": mean([t["rating"] for t in ts]),
+                           "hypothetical": mean([st["hypothetical_score"] for st in sts if st.get("hypothetical_score")])})
 
-    by_pair = defaultdict(list)
+    # Series: one prompt over several images (IMG-*) or one image under several prompts (TXT-*).
+    by_series = defaultdict(list)
     for st in STUDY:
-        roles = list(st.get("pair_roles") or [])
-        for i, pid in enumerate(st["pair_ids"]):
+        if st.get("series_id"):
             ratings = [t["rating"] for t in trials[st["sample_id"]]]
-            by_pair[pid].append({"sample_id": st["sample_id"], "prompt": st["prompt"],
-                                 "pair_role": roles[i] if i < len(roles) else None,
-                                 "n": len(ratings), "mean": mean(ratings)})
-    pairs = [{"pair_id": pid, "members": members} for pid, members in sorted(by_pair.items())]
+            by_series[st["series_id"]].append({"sample_id": st["sample_id"], "prompt": st["prompt"],
+                                               "category": st.get("category"), "level": st.get("level"),
+                                               "hypothetical": st.get("hypothetical_score"),
+                                               "n": len(ratings), "mean": mean(ratings)})
+    series = [{"series_id": sid, "members": members} for sid, members in sorted(by_series.items())]
 
     recent = sorted(sessions, key=lambda s: s.get("received_at") or "", reverse=True)[:100]
     return {
@@ -683,11 +710,12 @@ def summarize(sessions):
                    # What the list shows, for the admin page: its images (checks marked) and its rankings.
                    "stimuli": [{"sample_id": i, "prompt": BY_ID[i]["prompt"], "file_name": BY_ID[i]["file_name"],
                                 "check": is_attention_check(BY_ID[i])} for i in LISTS[k]],
-                   "rankings": [{"set_id": r, "prompt": SET_BY_ID[r]["prompt"],
-                                 "images": [im["file_name"] for im in SET_BY_ID[r]["images"]]}
+                   "rankings": [{"set_id": r, "axis": SET_BY_ID[r]["axis"], "prompt": SET_BY_ID[r]["prompt"],
+                                 "images": [im["file_name"] for im in SET_BY_ID[r]["images"]],
+                                 "prompts": [im["prompt"] for im in SET_BY_ID[r]["images"]]}
                                 for r in LIST_RANKINGS[k]]}
                   for k in range(len(LISTS))],
-        "categories": categories, "pairs": pairs, "stimuli": stimuli, "rankings": summarize_rankings(included),
+        "categories": categories, "series": series, "stimuli": stimuli, "rankings": summarize_rankings(included),
         # No Prolific IDs here: the page only needs to tell sessions apart.
         "sessions": [{"session": str(s.get("session_id", ""))[:8], "list_id": s.get("list_id"),
                       "received_at": s.get("received_at"),
@@ -702,21 +730,23 @@ def summarize(sessions):
 
 
 def summarize_rankings(sessions):
-    """Per ranking group: how many times it was ranked, and each image's mean rank (1 = favourite)."""
+    """Per ranking group: how many times it was ranked, and each member's mean rank (1 = best)."""
     ranks = defaultdict(lambda: defaultdict(list))
     for s in sessions:
         for r in s.get("rankings") or []:
-            for k, i in enumerate(r.get("order") or [], 1):
-                ranks[r.get("set_id")][i].append(k)
+            st = SET_BY_ID.get(r.get("set_id"))
+            if st and sorted(r.get("order") or []) == sorted(im["id"] for im in st["images"]):
+                for k, i in enumerate(r["order"], 1):
+                    ranks[st["set_id"]][i].append(k)
     out = []
     for st in RANKING_SETS:
         got = ranks[st["set_id"]]
-        images = [{**im, "case_id": (BY_ID.get(im["sample_id"]) or {}).get("case_id"),
-                   "n": len(got[im["image_id"]]), "mean_rank": mean(got[im["image_id"]]),
-                   "first": mean([k == 1 for k in got[im["image_id"]]])}
+        images = [{**im, "level": (BY_ID.get(im["sample_id"]) or {}).get("level"),
+                   "n": len(got[im["id"]]), "mean_rank": mean(got[im["id"]]),
+                   "first": mean([k == 1 for k in got[im["id"]]])}
                   for im in st["images"]]
         images.sort(key=lambda im: (im["mean_rank"] is None, im["mean_rank"] or 0))
-        out.append({**{k: st[k] for k in ("set_id", "prompt", "visual_style")},
+        out.append({**{k: st[k] for k in ("set_id", "axis", "prompt", "visual_style", "lists")},
                     "n": max((im["n"] for im in images), default=0), "images": images})
     return out
 
@@ -745,7 +775,7 @@ def export_results(key: str = ""):
     read = lambda f: [json.loads(l) for l in Path(hf_hub_download(DATASET_REPO, f, repo_type="dataset", revision=DATASET_SHA,
                                                                   token=HF_TOKEN)).read_text().splitlines() if l.strip()]
     sessions = list(load_sessions(max_age=0).values())
-    files, note = human_export.export(sessions, STIMULI, read("pairs/pairs.jsonl"), read(GROUPS_FILE))
+    files, note = human_export.export(sessions, read("data/metadata.jsonl"), read(GROUPS_FILE))
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for path, rows in files.items():
@@ -772,7 +802,7 @@ def feedback_for(session):
         if s.get("session_id") == session.get("session_id") or is_excluded(s):
             continue
         for t in s.get("trials", []):
-            if t.get("rating"):
+            if t.get("rating") and current(t):
                 others[t.get("sample_id")].append(t["rating"])
     rows = []
     for t in session.get("trials", []):

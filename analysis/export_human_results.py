@@ -1,4 +1,4 @@
-"""Export the human study results in the dataset's own format (see the dataset README, Pairs and Groups).
+"""Export the human study results in the dataset's own format (see the dataset README, Fields and Groups).
 
 Usage:
     pip install huggingface_hub
@@ -6,7 +6,8 @@ Usage:
     python analysis/export_human_results.py path/to/responses      # a local copy (list*/<session>.json)
 
 The admin page of the Space has an Export button that gives the same files as a zip. Both use
-space/human_export.py, which describes the files and the rules (exclusions, family_human, ranking_human).
+space/human_export.py, which describes the files and the rules (exclusions, mean_human_score,
+details_human_score, ranking_human, details_ranking_human).
 """
 import argparse
 import json
@@ -23,9 +24,6 @@ ap.add_argument("responses", help="responses repo id, or a local folder of sessi
 ap.add_argument("--dataset", default="Enzo-py/partial-prompting-ds")
 ap.add_argument("--revision", default=None, help="dataset revision (default: latest)")
 ap.add_argument("--out", default="human_results")
-ap.add_argument("--margin", type=float, default=0.5, help="rating difference that counts as a change (default 0.5)")
-ap.add_argument("--min-ratings", type=int, default=10, help="ratings per pair member needed to decide (default 10)")
-ap.add_argument("--min-rankings", type=int, default=5, help="rankings per group needed to order it (default 5)")
 ap.add_argument("--include-excluded", action="store_true", help="keep the sessions that fail the quality checks")
 args = ap.parse_args()
 
@@ -40,8 +38,7 @@ sessions = [json.loads(f.read_text()) for f in sorted(local.glob("list*/*.json")
 if not sessions:
     raise SystemExit(f"No sessions in {args.responses}.")
 
-files, note = human_export.export(sessions, get("data/metadata.jsonl"), get("pairs/pairs.jsonl"), get("groups/groups.jsonl"),
-                                  args.margin, args.min_ratings, args.min_rankings, args.include_excluded)
+files, note = human_export.export(sessions, get("data/metadata.jsonl"), get("groups/groups.jsonl"), args.include_excluded)
 for path, rows in files.items():
     (Path(args.out) / path).parent.mkdir(parents=True, exist_ok=True)
     (Path(args.out) / path).write_text(human_export.jsonl(rows))
